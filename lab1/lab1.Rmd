@@ -1,0 +1,475 @@
+---
+title: "lab1"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
+date: "2024-03-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse) 
+library(kableExtra)
+library(GGally)
+library(qqplotr)
+library(Hmisc)
+```
+
+# зчитуємо датасет
+```{r reading}
+hotel <- read.csv("Hotel Reservations.csv")
+```
+
+# можемо побачити, що в ньому 36275 спостережень і 19 змінних
+```{r review}
+str(hotel, give.attr = FALSE)
+```
+# перевiрка даних на вiдсутнiсть очевидних помилок, одрукiв, неправильного кодування тощо
+```{r describe}
+describe(hotel)
+```
+
+# перевірка на кількість пропущених значень для кожної змінної
+```{r na_check1}
+hotel %>% summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  select(where(~ all(.) > 0))
+```
+
+# перевірка на частку пропущених значень для кожної змінної
+```{r na_check2}
+hotel %>% summarise(across(everything(), ~ mean(is.na(.)))) %>%
+  select(where(~ all(.) > 0))
+```
+```{r var mutate}
+# переведення відповідних змінних у фактор
+hotel <- hotel %>% mutate(repeated_guest = as.factor(repeated_guest), 
+                          required_car_parking_space = as.factor(required_car_parking_space),
+                          booking_status = as.factor(booking_status),
+                          room_type_reserved = as.factor(room_type_reserved))
+```
+
+# штуки
+```{r margin1}
+addmargins(cont_tab <- xtabs(~ no_of_adults + no_of_children, data = hotel))
+```
+
+```{r margin2}
+addmargins(cont_tab <- xtabs(~ market_segment_type + booking_status, data = hotel))
+```
+
+```{r margin3}
+addmargins(cont_tab <- xtabs(~ no_of_children + no_of_special_requests, data = hotel))
+```
+
+```{r margin4}
+addmargins(cont_tab <- xtabs(~ booking_status + market_segment_type, data = hotel))
+```
+
+```{r margin5}
+addmargins(cont_tab <- xtabs(~ type_of_meal_plan + room_type_reserved, data = hotel))
+```
+
+```{r ftable}
+ftable(xtabs(~ no_of_adults + no_of_children + booking_status, data = hotel))
+```
+
+# додаткова колонка - загальна кількість ночей
+```{r hotel with nights}
+hotel_with_nights <- hotel %>% mutate(no_of_nights = no_of_weekend_nights + no_of_week_nights)
+```
+
+```{r geombar}
+ggplot(hotel_with_nights, aes(x = no_of_nights)) +
+  geom_bar() +
+  theme_classic()
+```
+
+
+# двовимірний графік (діаграма розсіювання для avg_price_per_room)
+```{r avg_price_per_room plot}
+plot(hotel$avg_price_per_room, xlab = 'запис, №', ylab = 'середня ціна за кімнату, $')
+```
+
+# одновимірний графік (те саме через гістограму)
+```{r same, but using hist}
+ggplot(hotel, aes(x = avg_price_per_room)) +
+  geom_histogram()
+```
+
+# пошук викидів за допомогою фільтра Гампеля
+```{r Hampel(?) filter}
+hotel %>% filter(avg_price_per_room < median(avg_price_per_room) - 3*mad(avg_price_per_room) | avg_price_per_room > median(avg_price_per_room) + 3*mad(avg_price_per_room)) %>%
+  arrange(avg_price_per_room)
+```
+
+# перегляд інформації про дорогі кімнати
+```{r expensive rooms filter}
+hotel %>% filter(avg_price_per_room > 300)
+```
+
+# двовимірний графік (середня ціна за кімнату, кількість ночей зупинки)
+```{r geom_point for nights/avg_price}
+ggplot(hotel_with_nights, aes(x = avg_price_per_room, y = no_of_nights, color = as.factor(room_type_reserved))) +
+  geom_point()
+```
+
+```{r max price filter}
+hotel %>% filter(avg_price_per_room == max(avg_price_per_room))
+```
+# як можна побачити, кімната вартістю $540 є очевидним викидом, адже її цінова категорія концентрується
+# навколо вартості у ~$75, тож ймовірно у ціну був записаний зайвий нуль
+
+# подивимось як цей викид буде зображено на Q-Q Plot
+```{r avg_price qqnorm}
+qqnorm(hotel$avg_price_per_room, main = 'Normal Q-Q Plot для avg_price_per_room')
+```
+
+```{r other qqnorms}
+qqnorm(hotel$no_of_week_nights, main = 'Normal Q-Q Plot для no_of_week_nights')
+qqnorm(hotel$no_of_weekend_nights, main = 'Normal Q-Q Plot для no_of_weekend_nights')
+qqnorm(hotel$lead_time, main = 'Normal Q-Q Plot для lead_time')
+```
+
+# гістограми
+```{r hist1}
+ggplot(hotel, aes(x = arrival_date)) +
+  geom_bar()
+```
+
+```{r hist2}
+ggplot(hotel_with_nights, aes(x = no_of_nights)) +
+  geom_bar() +
+  theme_classic()
+```
+
+# вусаті скриньки
+```{r boxplots}
+ggplot(hotel, aes(x = room_type_reserved, y = avg_price_per_room)) +
+  geom_boxplot(varwidth = FALSE)
+
+ggplot(hotel, aes(x = factor(no_of_adults), y = lead_time)) +
+  geom_boxplot(varwidth = FALSE)
+
+ggplot(hotel, aes(x = factor(no_of_children), y = lead_time)) +
+  geom_boxplot(varwidth = FALSE)
+
+ggplot(hotel, aes(x = type_of_meal_plan, y = avg_price_per_room)) +
+  geom_boxplot(varwidth = FALSE)
+```
+
+# логаритмування для вусатої скриньки
+```{r boxplot log}
+ggplot(hotel, aes(x = factor(no_of_adults), y = log(lead_time))) +
+  geom_boxplot(varwidth = FALSE)
+```
+
+# стовпчикові діаграми
+```{r geom_bars}
+cont_tab <- xtabs(~ required_car_parking_space + booking_status, data = hotel)
+cont_tab
+
+ggplot(hotel, aes(x = required_car_parking_space, fill = booking_status)) +
+  geom_bar()
+
+ggplot(hotel, aes(x = required_car_parking_space, fill = booking_status)) +
+  geom_bar(position = 'fill')
+
+ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = required_car_parking_space)) +
+  geom_bar()
+
+ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = required_car_parking_space)) +
+  geom_bar(position = 'fill')
+
+ggplot(hotel, aes(x = no_of_previous_cancellations, fill = required_car_parking_space)) +
+  geom_bar()
+
+ggplot(hotel, aes(x = no_of_previous_cancellations, fill = required_car_parking_space)) +
+  geom_bar(position = 'fill')
+
+ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = as.factor(repeated_guest))) +
+  geom_bar()
+
+ggplot(hotel, aes(x = booking_status, fill = repeated_guest)) +
+  geom_bar(position = "dodge")
+```
+
+# хз
+```{r some freqpoly}
+hotel <- hotel %>% mutate(arrival_year_and_month = paste(arrival_year, arrival_month, arrival_date, sep = "-"))
+ggplot(hotel, aes(x = as.Date(arrival_year_and_month))) +
+  geom_freqpoly(bins = 100)
+```
+
+# (додаткові типи графіків) візуалізація кількості room_type_reserved
+```{r additional graphs}
+bar <- ggplot(data = hotel) +
+  geom_bar(
+    mapping = aes(x = room_type_reserved, fill = room_type_reserved),
+    show.legend = FALSE,
+    width = 1
+  ) +
+  theme(aspect.ratio = 1) +
+  labs(x = NULL, y = NULL)
+bar + coord_flip()
+bar + coord_polar()
+```
+
+# цікавий графік через geom_density
+```{r some geom_density}
+ggplot(hotel, aes(x=lead_time, fill=booking_status))+
+  geom_density(alpha=0.5)
+```
+
+# двовимірні графіки
+# (додаткові типи графіків) violin графік для (booking_status, lead_time)
+```{r violin c:}
+ggplot(hotel, aes(x=booking_status, y=lead_time))+
+  geom_violin(fill = "skyblue", color = "darkblue", alpha = 0.8)+
+  scale_x_discrete(labels = c("Відмінено", "Не відмінено"))+
+  labs(x="Статус бронювання",
+       y="Час від бронювання до прибуття")
+```
+
+# (додаткові типи графіків)
+```{r idk1}
+ggplot(data = hotel, aes(x = lead_time, y = avg_price_per_room, color = booking_status)) +
+  geom_smooth()
+```
+
+```{r one more mutate}
+hotel <- hotel %>% mutate(arrival_year_and_month = paste(arrival_year, arrival_month, arrival_date, sep = "-"))
+```
+
+```{r some geom_points}
+ggplot(hotel, aes(x = as.Date(arrival_year_and_month), y = avg_price_per_room)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth()
+
+hotel_filtered_by_price <- hotel %>% filter(avg_price_per_room > 9)
+ggplot(hotel_filtered_by_price, aes(x = as.Date(arrival_year_and_month), y = avg_price_per_room)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth()
+```
+
+# одновимірний графік (гістограма для відфільтрованих цін)
+```{r hist for filtered prices}
+hotel_avg_prices <- hotel %>% filter((avg_price_per_room > 9))
+ggplot(hotel_avg_prices, aes(x = avg_price_per_room)) +
+  geom_histogram()
+```
+
+```{r avg_price density}
+hotel_filtered <- subset(hotel, avg_price_per_room > 9)
+ggplot(hotel_filtered ,
+       aes(x = avg_price_per_room, y = after_stat(density),
+           color = room_type_reserved)) +
+  geom_density() +
+  labs(x = "Ціна, $", y = "Щільність", color = "Тип кімнати") +
+  theme(axis.title = element_text(size = 25),
+        axis.text = element_text(size = 20),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 20))
+```
+
+```{r something similar}
+ggplot(hotel_filtered ,
+       aes(x = avg_price_per_room, y = after_stat(density),
+           fill = room_type_reserved)) +
+  geom_histogram(bins = 50) +
+  labs(x = "Ціна, $", y = "Щільність", color = "Тип кімнати") +
+  theme(axis.title = element_text(size = 25),
+        axis.text = element_text(size = 20),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 20))
+```
+
+```{r idk2}
+ggplot(hotel_filtered_by_price, aes(x = avg_price_per_room, y = lead_time, color = as.factor(room_type_reserved))) +
+  geom_point(alpha = 0.1)
+```
+
+# кореляція
+```{r corr1}
+ggcorr(hotel %>% select(where(is.numeric)), label = TRUE)
+# Як можна бачити, особливо сильної кореляції між змінними немає
+```
+
+```{r corr2}
+ggcorr(hotel %>% select(where(is.numeric)), label = TRUE,
+       method = c("pairwise", "spearman"))
+```
+
+```{r slice}
+hotel_sliced <- slice_sample(hotel_avg_prices, n = 5000)
+```
+
+# логаритмування та інше
+```{r log1}
+ggplot(hotel_sliced, aes(sample = lead_time)) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band()
+```
+
+```{r (not log) 2}
+ggplot(hotel_sliced, aes(sample = avg_price_per_room)) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band()
+```
+
+
+```{r log3}
+ggplot(hotel_sliced, aes(sample = log(lead_time))) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band()
+```
+
+```{r log4}
+ggplot(hotel_sliced, aes(sample = log(avg_price_per_room))) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band()
+```
+
+```{r}
+hotel_grouped_by_room <- hotel %>% 
+  dplyr::group_by(no_of_adults, no_of_children, room_type_reserved) %>% 
+  dplyr::summarize(total = n(), .groups = "drop")
+
+hotel_grouped_by_room
+```
+
+```{r}
+hotel_grouped_by_room <- hotel_grouped_by_room %>%
+  mutate(pair = paste("(", no_of_adults, ",", no_of_children, ")", sep = "")) %>%
+  arrange(desc(no_of_adults + no_of_children))
+```
+
+```{r}
+ggplot(hotel_grouped_by_room, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(room_type_reserved))) + 
+  geom_bar(stat = "identity") +
+  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(hotel_grouped_by_room, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(room_type_reserved))) + 
+  geom_bar(position = 'fill', stat = "identity") +
+  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+hotel_grouped_by_meal <- hotel %>% 
+  dplyr::group_by(no_of_adults, no_of_children, type_of_meal_plan) %>% 
+  dplyr::summarize(total = n(), .groups = "drop")
+
+hotel_grouped_by_meal
+```
+
+```{r}
+hotel_grouped_by_family <- hotel %>% 
+  dplyr::group_by(no_of_adults, no_of_children) %>% 
+  dplyr::summarize(total = n(), .groups = "drop")
+
+hotel_grouped_by_family
+```
+
+```{r}
+hotel_grouped_by_meal <- hotel_grouped_by_meal %>%
+  mutate(pair = paste("(", no_of_adults, ",", no_of_children, ")", sep = "")) %>%
+  arrange(desc(no_of_adults + no_of_children))
+```
+
+```{r}
+ggplot(hotel_grouped_by_meal, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(type_of_meal_plan))) + 
+  geom_bar(stat = "identity") +
+  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(hotel_grouped_by_meal, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(type_of_meal_plan))) + 
+  geom_bar(position = 'fill', stat = "identity") +
+  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+hotel %>% filter(type_of_meal_plan == 'Meal Plan 3')
+```
+
+```{r}
+ggplot(hotel, aes(x = no_of_special_requests, fill = as.factor(room_type_reserved))) + 
+  geom_bar(position = "fill")
+```
+
+```{r}
+hotel %>% filter(no_of_previous_bookings_not_canceled == 12)
+```
+
+```{r}
+ggplot(hotel_grouped_by_family, aes(x = no_of_adults, y = no_of_children, size = total)) +
+  geom_point()
+```
+
+
+```{r}
+ggplot(hotel, aes(x = room_type_reserved, fill = booking_status)) + geom_bar(position = "fill")
+```
+
+```{r}
+ggplot(hotel, aes(x = as.factor(required_car_parking_space), fill = booking_status)) +
+  geom_bar(position = "fill") +
+  labs(title = "Залежність стану бронювання від необхідності у парк. місці",
+       x = "Потреба у паркувальному місці",
+       y = "Частка") +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
+                    labels = c("відмінено", "не відмінено"))+
+  scale_x_discrete(labels = c("Не потрібне", "Потрібне"))
+```
+
+```{r}
+result <- hotel %>%
+  group_by(no_of_week_nights, no_of_weekend_nights) %>%
+  summarise_all(mean)
+
+result
+```
+
+```{r}
+# ВСЕ для 4
+ggplot(hotel, aes(x = avg_price_per_room, y = no_of_week_nights) ) + geom_point()
+
+ggplot(hotel, aes(x = avg_price_per_room, y = no_of_weekend_nights) ) + geom_point()
+
+ggplot(hotel_with_nights, aes(x = no_of_nights, fill = as.factor(room_type_reserved))) + geom_bar(position = "fill")
+
+hotel_with_nights <- hotel_with_nights %>% filter(avg_price_per_room > 20)
+
+hotel_with_nights <- hotel_with_nights %>% filter(avg_price_per_room > 9)
+ggplot(hotel_with_nights, aes(x = log(avg_price_per_room), y = after_stat(density), 
+                                  color = cut(no_of_nights, breaks = seq(min(no_of_nights), max(no_of_nights), by = 5)))) + geom_freqpoly(bins = 30) +
+    labs(x = "Логарифмована ціна, $", y = "Щільність", color = "Кількість ночей") +
+      theme(axis.title = element_text(size = 25),
+            axis.text = element_text(size = 20),
+            legend.title = element_text(size = 25),
+            legend.text = element_text(size = 20))
+
+hotel_with_nights <- hotel_with_nights %>%
+  mutate(lead_time = ifelse(lead_time == 0, 1, lead_time))
+
+
+ggplot(hotel_with_nights, aes(x = log(lead_time), y = after_stat(density), 
+                              color = cut(no_of_nights, breaks = c(0, 5, 10, 15, 20, max(no_of_nights) + 1)
+                                          ))) + geom_freqpoly(bins = 20) +
+  labs(x = "Логарифм. час до прибуття, $", y = "Щільність", color = "Кількість ночей") +
+      theme(axis.title = element_text(size = 25),
+            axis.text = element_text(size = 20),
+            legend.title = element_text(size = 25),
+            legend.text = element_text(size = 20))
+  
+
+ggplot(hotel_with_nights, aes(x = no_of_nights, fill = as.factor(no_of_children))) + geom_bar()
+ggplot(hotel_with_nights, aes(x = no_of_nights, fill = as.factor(no_of_children))) + geom_bar(position = "fill")
+
+hotel_cum <- hotel_avg_prices %>% filter(no_of_weekend_nights == 0 | no_of_week_nights == 0)
+
+ggplot(hotel_cum, aes(x = as.factor(no_of_weekend_nights), y = avg_price_per_room)) + geom_violin() + stat_summary(fun = mean, geom="point", shape=23, size=2) + geom_boxplot(width=0.1)
+
+ggplot(hotel_cum, aes(x = as.factor(no_of_week_nights), y = avg_price_per_room)) + geom_violin() +  stat_summary(fun = mean, geom="point", shape=23, size=2) + geom_boxplot(width=0.1)
+```
