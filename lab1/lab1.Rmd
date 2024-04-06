@@ -1,5 +1,5 @@
 ---
-title: "lab1"
+title: "Data analysis Lab 1"
 output:
   html_document:
     df_print: paged
@@ -18,263 +18,120 @@ library(qqplotr)
 library(Hmisc)
 ```
 
-# зчитуємо датасет
-```{r reading}
-hotel <- read.csv("Hotel Reservations.csv")
-```
 
-# можемо побачити, що в ньому 36275 спостережень і 19 змінних
-```{r review}
-str(hotel, give.attr = FALSE)
-```
-# перевiрка даних на вiдсутнiсть очевидних помилок, одрукiв, неправильного кодування тощо
+#### Назва команди - Команда №3
+#### Перелік учасників колективу виконавців:
+- Пономаренко Олександр (КМ-12)
+- Земляний Даниїл (КМ-12)
+- Борисенко Данило (КМ-11)
+- Заіченко Дамир (КМ-13)
+- Лук'яненко Василь (КМ-13)
+
+#### Команду цікавили відповіді на наступні сформовані дослідницькі питання:
+- Як змінюється кількість дорослих та дітей в залежності від типу номеру та плану харчування?
+- Яким чином розподіляється кількість особливих побажань в залежності від типу номеру?
+- Як впливає кількість дорослих і дітей на скасування бронювання?
+- Що впливає на кількість проведених вихідних та робочих ночей у готелі?
+- Як різні типи кімнат впливають на кількість попередніх скасувань/бронювань?
+- Чи є різниця в кількості попередніх скасувань для клієнтів, які вимагають паркувальне місце і тих, хто його не потребує?
+
+#### Очікувалося, що проведене дослідження також зможе підтвердити чи спростувати гіпотези подібного типу:
+- у вихідні дні кімнати в отелі коштують дорожче, ніж у будні
+- кількість дітей має вплив на кількість заброньованих ночей, відміну бронювання, потребу у паркувальному місці
+- та інші "природні" речі
+
+#### У цього датасету є більший "попередник", в описі якого вказано, що автор датасету брав натхнення з дослідження, яке використовувало дійсно існуючі дані, зібрані у двох готелях Португалії. Поточний датасет є очищеною версією, що не містить майже незадіяних змінних та купу missing data
+
+#### на етапі очищення даних необхідно було переконатися, що відсутні неправильні кодування даних, що числові змінні, які стосуються, наприклад, часу, не є від'ємними і тп. В дійсності, як було зазначено вище, датасет вже з самого початку був очищений, що було вказано у його тегах на відповідному сайті kaggle, але додаткову перевірку все ж було проведено. Нижче наводиться деяка інформація, що підтверджує чистоту даних:
+
+- перевiрка даних на вiдсутнiсть очевидних помилок, одрукiв, неправильного кодування тощо
 ```{r describe}
 describe(hotel)
 ```
 
-# перевірка на кількість пропущених значень для кожної змінної
+- перевірка на кількість пропущених значень для кожної змінної
 ```{r na_check1}
 hotel %>% summarise(across(everything(), ~ sum(is.na(.)))) %>%
   select(where(~ all(.) > 0))
 ```
 
-# перевірка на частку пропущених значень для кожної змінної
+- перевірка на частку пропущених значень для кожної змінної
 ```{r na_check2}
 hotel %>% summarise(across(everything(), ~ mean(is.na(.)))) %>%
   select(where(~ all(.) > 0))
 ```
+
+- переведення відповідних змінних у фактор
 ```{r var mutate}
-# переведення відповідних змінних у фактор
 hotel <- hotel %>% mutate(repeated_guest = as.factor(repeated_guest), 
                           required_car_parking_space = as.factor(required_car_parking_space),
                           booking_status = as.factor(booking_status),
                           room_type_reserved = as.factor(room_type_reserved))
 ```
 
-# штуки
-```{r margin1}
-addmargins(cont_tab <- xtabs(~ no_of_adults + no_of_children, data = hotel))
+- Подивимось на розмірність датасету. Можемо побачити, що в ньому 36275 спостережень і 19 змінних
+```{r review}
+str(hotel, give.attr = FALSE)
 ```
 
-```{r margin2}
-addmargins(cont_tab <- xtabs(~ market_segment_type + booking_status, data = hotel))
-```
+#### Викиди
+##### розглянемо конкретні результати, які було отримано під час проведення EDA
+- спочатку переглянемо, яким чином виглядає графік для середньої ціни за кімнату
+```{r}
+ggplot(hotel, aes(x = avg_price_per_room)) +
+  geom_histogram() + labs(x = "середня ціна за кімнату, $", y = "Кількість записів")
 
-```{r margin3}
-addmargins(cont_tab <- xtabs(~ no_of_children + no_of_special_requests, data = hotel))
-```
-
-```{r margin4}
-addmargins(cont_tab <- xtabs(~ booking_status + market_segment_type, data = hotel))
-```
-
-```{r margin5}
-addmargins(cont_tab <- xtabs(~ type_of_meal_plan + room_type_reserved, data = hotel))
-```
-
-```{r ftable}
-ftable(xtabs(~ no_of_adults + no_of_children + booking_status, data = hotel))
-```
-
-# додаткова колонка - загальна кількість ночей
-```{r hotel with nights}
-hotel_with_nights <- hotel %>% mutate(no_of_nights = no_of_weekend_nights + no_of_week_nights)
-```
-
-```{r geombar}
-ggplot(hotel_with_nights, aes(x = no_of_nights)) +
-  geom_bar() +
-  theme_classic()
-```
-
-
-# двовимірний графік (діаграма розсіювання для avg_price_per_room)
-```{r avg_price_per_room plot}
 plot(hotel$avg_price_per_room, xlab = 'запис, №', ylab = 'середня ціна за кімнату, $')
 ```
 
-# одновимірний графік (те саме через гістограму)
-```{r same, but using hist}
-ggplot(hotel, aes(x = avg_price_per_room)) +
-  geom_histogram()
+##### перше зауваження стосується цін, які близькі до нуля і утворюють цей розрив на графіку. Візьмемо середнє значення ціни умовно 10$ і переглянемо усі резервації, ціна яких менше 10$. Обравши серед цього зрізу змінну market_segment_type, побачимо наступну картину:
+```{r}
+segment_types <- hotel %>% filter(avg_price_per_room < 10) %>% select(market_segment_type)
+table(segment_types)
 ```
+##### ці резервації можна вважати резерваціями за "договірну" ціну, де ті, що Online, можна розглядати як домовленість по телефону чи по іншим засобам зв'язку 
 
-# пошук викидів за допомогою фільтра Гампеля
+- скориставшись фільтром Гампеля було виявлено приблизні пороги цін, до яких і після яких теоретично можуть знаходитись викиди
 ```{r Hampel(?) filter}
 hotel %>% filter(avg_price_per_room < median(avg_price_per_room) - 3*mad(avg_price_per_room) | avg_price_per_room > median(avg_price_per_room) + 3*mad(avg_price_per_room)) %>%
   arrange(avg_price_per_room)
 ```
 
-# перегляд інформації про дорогі кімнати
+##### подивимось на кількість резервацій з ціною у 0$
+```{r}
+hotel %>% filter(avg_price_per_room == 0)
+```
+##### як бачимо, таких рядків 545. Враховуючи те, що записів із ціною резервації <10$ було 373 + 225 = 598, то нічим іншим як договірною ціною цей випадок не пояснюється
+
+##### тепер, що стосується дорогих кімнат. Розглянемо кімнати із середньою ціною >300$, що перетинається з результатами фільтра Гампеля:
+- перегляд інформації про дорогі кімнати
 ```{r expensive rooms filter}
 hotel %>% filter(avg_price_per_room > 300)
 ```
-
-# двовимірний графік (середня ціна за кімнату, кількість ночей зупинки)
-```{r geom_point for nights/avg_price}
-ggplot(hotel_with_nights, aes(x = avg_price_per_room, y = no_of_nights, color = as.factor(room_type_reserved))) +
-  geom_point()
-```
-
-```{r max price filter}
-hotel %>% filter(avg_price_per_room == max(avg_price_per_room))
-```
-# як можна побачити, кімната вартістю $540 є очевидним викидом, адже її цінова категорія концентрується
-# навколо вартості у ~$75, тож ймовірно у ціну був записаний зайвий нуль
-
-# подивимось як цей викид буде зображено на Q-Q Plot
-```{r avg_price qqnorm}
-qqnorm(hotel$avg_price_per_room, main = 'Normal Q-Q Plot для avg_price_per_room')
-```
-
-```{r other qqnorms}
-qqnorm(hotel$no_of_week_nights, main = 'Normal Q-Q Plot для no_of_week_nights')
-qqnorm(hotel$no_of_weekend_nights, main = 'Normal Q-Q Plot для no_of_weekend_nights')
-qqnorm(hotel$lead_time, main = 'Normal Q-Q Plot для lead_time')
-```
-
-# гістограми
-```{r hist1}
-ggplot(hotel, aes(x = arrival_date)) +
-  geom_bar()
-```
-
-```{r hist2}
-ggplot(hotel_with_nights, aes(x = no_of_nights)) +
-  geom_bar() +
-  theme_classic()
-```
-
-# вусаті скриньки
-```{r boxplots}
-ggplot(hotel, aes(x = room_type_reserved, y = avg_price_per_room)) +
-  geom_boxplot(varwidth = FALSE)
-
-ggplot(hotel, aes(x = factor(no_of_adults), y = lead_time)) +
-  geom_boxplot(varwidth = FALSE)
-
-ggplot(hotel, aes(x = factor(no_of_children), y = lead_time)) +
-  geom_boxplot(varwidth = FALSE)
-
-ggplot(hotel, aes(x = type_of_meal_plan, y = avg_price_per_room)) +
-  geom_boxplot(varwidth = FALSE)
-```
-
-# логаритмування для вусатої скриньки
-```{r boxplot log}
-ggplot(hotel, aes(x = factor(no_of_adults), y = log(lead_time))) +
-  geom_boxplot(varwidth = FALSE)
-```
-
-# стовпчикові діаграми
-```{r geom_bars}
-cont_tab <- xtabs(~ required_car_parking_space + booking_status, data = hotel)
-cont_tab
-
-ggplot(hotel, aes(x = required_car_parking_space, fill = booking_status)) +
-  geom_bar()
-
-ggplot(hotel, aes(x = required_car_parking_space, fill = booking_status)) +
-  geom_bar(position = 'fill')
-
-ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = required_car_parking_space)) +
-  geom_bar()
-
-ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = required_car_parking_space)) +
-  geom_bar(position = 'fill')
-
-ggplot(hotel, aes(x = no_of_previous_cancellations, fill = required_car_parking_space)) +
-  geom_bar()
-
-ggplot(hotel, aes(x = no_of_previous_cancellations, fill = required_car_parking_space)) +
-  geom_bar(position = 'fill')
-
-ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = as.factor(repeated_guest))) +
-  geom_bar()
-
-ggplot(hotel, aes(x = booking_status, fill = repeated_guest)) +
-  geom_bar(position = "dodge")
-```
-
-# хз
-```{r some freqpoly}
-hotel <- hotel %>% mutate(arrival_year_and_month = paste(arrival_year, arrival_month, arrival_date, sep = "-"))
-ggplot(hotel, aes(x = as.Date(arrival_year_and_month))) +
-  geom_freqpoly(bins = 100)
-```
-
-# (додаткові типи графіків) візуалізація кількості room_type_reserved
-```{r additional graphs}
-bar <- ggplot(data = hotel) +
-  geom_bar(
-    mapping = aes(x = room_type_reserved, fill = room_type_reserved),
-    show.legend = FALSE,
-    width = 1
-  ) +
-  theme(aspect.ratio = 1) +
-  labs(x = NULL, y = NULL)
-bar + coord_flip()
-bar + coord_polar()
-```
-
-# цікавий графік через geom_density
-```{r some geom_density}
-ggplot(hotel, aes(x=lead_time, fill=booking_status))+
-  geom_density(alpha=0.5)
-```
-
-# двовимірні графіки
-# (додаткові типи графіків) violin графік для (booking_status, lead_time)
-```{r violin c:}
-ggplot(hotel, aes(x=booking_status, y=lead_time))+
-  geom_violin(fill = "skyblue", color = "darkblue", alpha = 0.8)+
-  scale_x_discrete(labels = c("Відмінено", "Не відмінено"))+
-  labs(x="Статус бронювання",
-       y="Час від бронювання до прибуття")
-```
-
-# (додаткові типи графіків)
-```{r idk1}
-ggplot(data = hotel, aes(x = lead_time, y = avg_price_per_room, color = booking_status)) +
-  geom_smooth()
-```
-
-```{r one more mutate}
-hotel <- hotel %>% mutate(arrival_year_and_month = paste(arrival_year, arrival_month, arrival_date, sep = "-"))
-```
-
-```{r some geom_points}
-ggplot(hotel, aes(x = as.Date(arrival_year_and_month), y = avg_price_per_room)) +
-  geom_point(alpha = 0.3) +
-  geom_smooth()
-
-hotel_filtered_by_price <- hotel %>% filter(avg_price_per_room > 9)
-ggplot(hotel_filtered_by_price, aes(x = as.Date(arrival_year_and_month), y = avg_price_per_room)) +
-  geom_point(alpha = 0.3) +
-  geom_smooth()
-```
-
-# одновимірний графік (гістограма для відфільтрованих цін)
-```{r hist for filtered prices}
-hotel_avg_prices <- hotel %>% filter((avg_price_per_room > 9))
-ggplot(hotel_avg_prices, aes(x = avg_price_per_room)) +
-  geom_histogram()
-```
+- переглянемо чи усі ці резервації мають адекватну для свого типу кімнати ціну:
 
 ```{r avg_price density}
 hotel_filtered <- subset(hotel, avg_price_per_room > 9)
+
+ggplot(hotel_avg_prices, aes(x = avg_price_per_room, y = lead_time, color = as.factor(room_type_reserved))) +
+  geom_point(alpha = 0.1) + labs (x = "середня ціна за кімнату, $", y = "Час до прибуття, год") +
+  scale_color_manual(name = "Тип кімнати",
+                     values = room_type_vector,
+                     labels = room_label_vector)
+
 ggplot(hotel_filtered ,
        aes(x = avg_price_per_room, y = after_stat(density),
-           color = room_type_reserved)) +
-  geom_density() +
-  labs(x = "Ціна, $", y = "Щільність", color = "Тип кімнати") +
+           fill = room_type_reserved)) +
+  geom_density(alpha = 0.2) +
+  labs(x = "Ціна, $", y = "Щільність", fill = "Тип кімнати") +
   theme(axis.title = element_text(size = 25),
         axis.text = element_text(size = 20),
         legend.title = element_text(size = 25),
-        legend.text = element_text(size = 20))
-```
+        legend.text = element_text(size = 20)) +
+  scale_fill_manual(name = "Тип кімнати",
+                    values = room_type_vector,
+                    labels = room_label_vector)
 
-```{r something similar}
 ggplot(hotel_filtered ,
        aes(x = avg_price_per_room, y = after_stat(density),
            fill = room_type_reserved)) +
@@ -283,193 +140,635 @@ ggplot(hotel_filtered ,
   theme(axis.title = element_text(size = 25),
         axis.text = element_text(size = 20),
         legend.title = element_text(size = 25),
-        legend.text = element_text(size = 20))
-```
-
-```{r idk2}
-ggplot(hotel_filtered_by_price, aes(x = avg_price_per_room, y = lead_time, color = as.factor(room_type_reserved))) +
-  geom_point(alpha = 0.1)
-```
-
-# кореляція
-```{r corr1}
-ggcorr(hotel %>% select(where(is.numeric)), label = TRUE)
-# Як можна бачити, особливо сильної кореляції між змінними немає
-```
-
-```{r corr2}
-ggcorr(hotel %>% select(where(is.numeric)), label = TRUE,
-       method = c("pairwise", "spearman"))
-```
-
-```{r slice}
-hotel_sliced <- slice_sample(hotel_avg_prices, n = 5000)
-```
-
-# логаритмування та інше
-```{r log1}
-ggplot(hotel_sliced, aes(sample = lead_time)) +
-  stat_qq_point() + stat_qq_line() + stat_qq_band()
-```
-
-```{r (not log) 2}
-ggplot(hotel_sliced, aes(sample = avg_price_per_room)) +
-  stat_qq_point() + stat_qq_line() + stat_qq_band()
+        legend.text = element_text(size = 20)) + 
+  scale_fill_manual(name = "Тип кімнати",
+                    values = room_type_vector,
+                    labels = room_label_vector)
 ```
 
 
-```{r log3}
-ggplot(hotel_sliced, aes(sample = log(lead_time))) +
-  stat_qq_point() + stat_qq_line() + stat_qq_band()
-```
-
-```{r log4}
-ggplot(hotel_sliced, aes(sample = log(avg_price_per_room))) +
-  stat_qq_point() + stat_qq_line() + stat_qq_band()
-```
-
+- як бачимо, кімнати першого типу є відносно дешевими, що не стикується з тим, що резервація з найбільшою середньою ціною була якраз на Room Type 1:
 ```{r}
-hotel_grouped_by_room <- hotel %>% 
-  dplyr::group_by(no_of_adults, no_of_children, room_type_reserved) %>% 
-  dplyr::summarize(total = n(), .groups = "drop")
-
-hotel_grouped_by_room
+hotel %>% filter(avg_price_per_room == max(avg_price_per_room))
 ```
+- на нашу думку, цей запис можна вважати викидом. Ймовірно у ціну був записаний зайвий '0' у кінці. Але в силу того, що такий запис лише один, і всі інші записи з ціною >300$ відносно нього та свого типу кімнати виглядають нормально, то ним можна знехтувати, адже дискриптивні статистики від цього особливо не спотворюються
 
+
+#### Перейдемо безпосередньо до дослідницьких питань
+
+#### ПЕРШЕ ЗАПИТАННЯ
+#### Формулювання:
+- Як змінюється кількість дорослих та дітей в залежності від типу номеру та плану харчування?
+
+##### Про випадки, коли кількість дорослих дорівнює чотирьом або нулю, важко зробити якісь висновки через замалу частку таких записів. Бачимо, що один або двоє дорослих частіше бронююють номери першого типу, троє дорослих - номери четвертого типу.
 ```{r}
-hotel_grouped_by_room <- hotel_grouped_by_room %>%
-  mutate(pair = paste("(", no_of_adults, ",", no_of_children, ")", sep = "")) %>%
-  arrange(desc(no_of_adults + no_of_children))
+ggplot(hotel, aes(x = no_of_adults, fill = as.factor(room_type_reserved))) + geom_bar() + 
+  labs(x = "Кількість дорослих", y = "Кількість записів", fill = "Тип Кімнати")+
+  scale_fill_manual(name = "Тип кімнати",
+                values = room_type_vector,
+                labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(hotel, aes(x = no_of_adults, fill = as.factor(room_type_reserved))) + geom_bar(position = "fill") + 
+  labs(title = "3 дорослих частіше селяться в 4 тип, четверо - в 7 тип", x = "Кількість дорослих", y = "Частка", fill = "Тип Кімнати")+
+  scale_fill_manual(name = "Тип кімнати",
+                values = room_type_vector,
+                labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
 ```
 
+##### Про випадки, де кількість дітей більше або дорівнює трьом, важко щось сказати через замалу частку таких записів. Коли дитина одна або дітей немає, частіше всього броюнюють номер першого типу, для двох дітей - частіше номер шостого типу.
+```{r}
+ggplot(hotel, aes(x = no_of_children, fill = as.factor(room_type_reserved))) + geom_bar() + 
+  labs(x = "Кількість дітей", y = "Кількість записів", fill = "Тип Кімнати") + 
+  scale_x_continuous(breaks = seq(0, max(hotel$no_of_children), by = 1))+
+  scale_fill_manual(name = "Тип кімнати",
+                values = room_type_vector,
+                labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(hotel, aes(x = no_of_children, fill = as.factor(room_type_reserved))) + geom_bar(position = "fill") + 
+  labs(x = "Кількість дітей", y = "Частка", fill = "Тип Кімнати") +
+  scale_x_continuous(breaks = seq(0, max(hotel$no_of_children), by = 1))+
+  scale_fill_manual(name = "Тип кімнати",
+                values = room_type_vector,
+                labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+```
+
+##### 1-2 дорослих без дітей або з однією дитиною, частіше всього обирають перший тип кімнати, троє дорослих - четвертий, двоє дорослих і двоє дітей - шостий. Про інші випадки важко зробити висновок, через малу кількість записів.
 ```{r}
 ggplot(hotel_grouped_by_room, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(room_type_reserved))) + 
   geom_bar(stat = "identity") +
-  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  labs(x = "Пара (дорослі, діти)", y = "Кількість записів", fill = "Тип кімнати") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(name = "Тип кімнати",
+                values = room_type_vector,
+                labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
 
 ggplot(hotel_grouped_by_room, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(room_type_reserved))) + 
   geom_bar(position = 'fill', stat = "identity") +
-  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  labs(title = "Розподіл записів в залежності від кількості дорослих/дітей",x = "Пара (дорослі, діти)", y = "Частка", fill = "Тип кімнати") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(name = "Тип кімнати",
+                values = room_type_vector,
+                labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
 ```
 
+##### Бачимо, що незалежно від кількості дорослих, найбільшу перевагу віддають типу харчування BB, двоє дорослих частіше не обирають тип харчування, ніж один або троє.
 ```{r}
-hotel_grouped_by_meal <- hotel %>% 
-  dplyr::group_by(no_of_adults, no_of_children, type_of_meal_plan) %>% 
-  dplyr::summarize(total = n(), .groups = "drop")
 
-hotel_grouped_by_meal
+ggplot(hotel, aes(x = no_of_adults, fill = as.factor(type_of_meal_plan))) + geom_bar() + 
+  labs(x = "Кількість дорослих", y = "Кількість записів", fill = "Тип плану харчування") +
+  scale_fill_manual(values = meal_type_vector,
+    labels = meal_label_vector)
+
+ggplot(hotel, aes(x = no_of_adults, fill = as.factor(type_of_meal_plan))) + geom_bar(position = "fill") + 
+  labs(x = "Кількість дорослих", y = "Частка", fill = "Тип плану харчування") +
+  scale_fill_manual(values = meal_type_vector,
+    labels = meal_label_vector)
+
+ggplot(hotel, aes(x = type_of_meal_plan, fill = as.factor(no_of_adults))) + 
+  geom_bar(position = "fill") +
+  labs(fill = "Кількість дорослих") +
+  scale_x_discrete(labels = meal_label_vector)
+
 ```
 
+##### Видно, що зі збільшенням кількості дітей (від одного до трьох), зростає частка бронювань, де обрано тип харчування BB.
 ```{r}
-hotel_grouped_by_family <- hotel %>% 
-  dplyr::group_by(no_of_adults, no_of_children) %>% 
-  dplyr::summarize(total = n(), .groups = "drop")
+ggplot(hotel, aes(x = no_of_children, fill = as.factor(type_of_meal_plan))) + geom_bar() + 
+  labs(x = "Кількість дітей", y = "Кількість записів", fill = "Тип плану харчування") + 
+  scale_x_continuous(breaks = seq(0, max(hotel$no_of_children), by = 1)) +
+  scale_fill_manual(values = meal_type_vector,
+    labels = meal_label_vector)
 
-hotel_grouped_by_family
-```
+ggplot(hotel, aes(x = no_of_children, fill = as.factor(type_of_meal_plan))) + geom_bar(position = "fill") + 
+  labs(x = "Кількість дітей", y = "Частка", fill = "Тип плану харчування") + 
+  scale_x_continuous(breaks = seq(0, max(hotel$no_of_children), by = 1)) +
+  scale_fill_manual(values = meal_type_vector,
+    labels = meal_label_vector)
 
-```{r}
-hotel_grouped_by_meal <- hotel_grouped_by_meal %>%
-  mutate(pair = paste("(", no_of_adults, ",", no_of_children, ")", sep = "")) %>%
-  arrange(desc(no_of_adults + no_of_children))
-```
 
-```{r}
 ggplot(hotel_grouped_by_meal, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(type_of_meal_plan))) + 
   geom_bar(stat = "identity") +
-  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  labs(x = "Пара (дорослі, діти)", y = "Кількість записів", fill = "Тип плану харчування") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = meal_type_vector,
+    labels = meal_label_vector)
+
 
 ggplot(hotel_grouped_by_meal, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = as.factor(type_of_meal_plan))) + 
   geom_bar(position = 'fill', stat = "identity") +
-  labs(x = "Pair (no_of_adults, no_of_children)", y = "Count", fill = "Number of Adults") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  labs(x = "Пара (дорослі, діти)", y = "Частка", fill = "Тип плану харчування") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = meal_type_vector,
+    labels = meal_label_vector)
 ```
 
-```{r}
-hotel %>% filter(type_of_meal_plan == 'Meal Plan 3')
-```
 
+#### ДРУГЕ ЗАПИТАННЯ
+
+#### Формулювання:
+- Яким чином розподіляється кількість особливих побажань в залежності від типу номеру?
+
+##### Побудуємо стовпчикову діаграму на основі даних про кількість особливих бажань, розфарбуємо в різні кольори відповідні типи кімнат. Якщо побудувати графік за кількістю записів, можна побачити, що для кожного числа особливих бажань приблизно однаковий розподіл типів кімнат. Якщо ж побудувати графік не по кількості особливих запитів, а по частці типів кімнат для кожної кількості особливих побажань (другий графік), спостерігаємо, що чим більше особливих бажань, тим більше частка кращих кімнат (кімнат 4,6 типу, частково 7 типу). Можливо, такий результат можна пов'язаний з тим, що у людей які мають гроші на кращі апартаменти, є гроші і на певні додаткові особливі побажання.
 ```{r}
 ggplot(hotel, aes(x = no_of_special_requests, fill = as.factor(room_type_reserved))) + 
-  geom_bar(position = "fill")
+  geom_bar() + scale_x_continuous(breaks = seq(0, max(hotel$no_of_special_requests), by = 1)) +
+  labs(x = "Кількість особливих побажань", y = "Кількість записів", fill = "Тип кімнати") +
+  scale_fill_manual(name = "Тип кімнати",
+                  values = room_type_vector,
+                  labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+
+
+ggplot(hotel, aes(x = no_of_special_requests, fill = as.factor(room_type_reserved))) + 
+  geom_bar(position = "fill") + scale_x_continuous(breaks = seq(0, max(hotel$no_of_special_requests), by = 1)) +
+  labs(title = "Чим більше ос. побажань тим більше частка кращих кімнат",x = "Кількість особливих побажань", y = "Частка", fill = "Тип кімнати") +
+  scale_fill_manual(name = "Тип кімнати",
+                  values = room_type_vector,
+                  labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
 ```
 
-```{r}
-hotel %>% filter(no_of_previous_bookings_not_canceled == 12)
+
+#### ТРЕТЄ ЗАПИТАННЯ
+
+#### Формулювання:
+- Як впливає кількість дорослих і дітей на скасування бронювання?
+
+##### Спочатку, переглянемо яка кількість яких типів сімей (кількість дорослих, кількість дітей) робить резервації у готель:
+```{r ftable}
+ftable(xtabs(~ no_of_adults + no_of_children + booking_status, data = hotel))
 ```
+##### Нескладно помітити, що найпопулярнішими "типами" сімей є (1 дорослий без дітей), (2 дорослих без дітей), (2 дорослих з 1-2 дітьми) і (3 дорослих без дітей)
 
+##### Побудуємо стовпчикові діаграми: кількість записів і кількість дорослих, позначивши кольорами статус бронювання записів, і таку ж, але частки замість кількості записів.
 ```{r}
-ggplot(hotel_grouped_by_family, aes(x = no_of_adults, y = no_of_children, size = total)) +
-  geom_point()
-```
-
-
-```{r}
-ggplot(hotel, aes(x = room_type_reserved, fill = booking_status)) + geom_bar(position = "fill")
-```
-
-```{r}
-ggplot(hotel, aes(x = as.factor(required_car_parking_space), fill = booking_status)) +
-  geom_bar(position = "fill") +
-  labs(title = "Залежність стану бронювання від необхідності у парк. місці",
-       x = "Потреба у паркувальному місці",
-       y = "Частка") +
+ggplot(hotel, aes(x = no_of_adults, fill = as.factor(booking_status))) + geom_bar() + 
+  labs(x = "Кількість дорослих", y = "Кількість записів", fill = "Статус бронювання") +
   scale_fill_manual(name = "Статус бронювання",
                     values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
-                    labels = c("відмінено", "не відмінено"))+
-  scale_x_discrete(labels = c("Не потрібне", "Потрібне"))
+                    labels = c("Відмінено", "Не відмінено"))
+
+ggplot(hotel, aes(x = no_of_adults, fill = as.factor(booking_status))) + geom_bar(position = "fill") + 
+  labs(x = "Кількість дорослих", y = "Частка", fill = "Статус бронювання") +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
+                    labels = c("Відмінено", "Не відмінено"))
 ```
 
-```{r}
-result <- hotel %>%
-  group_by(no_of_week_nights, no_of_weekend_nights) %>%
-  summarise_all(mean)
+##### З другого графіку можемо побачити, що пропорційно статус бронювання практично не змінюється від кількості дорослих, тобто хоч дорослих 0 , хоч їх 4, відмінені будуть приблизно 30% записів. 
 
-result
+##### Побудуємо аналогічні стовпчикові діаграми для кількості дітей:
+
+```{r}
+ggplot(hotel, aes(x = no_of_children, fill = as.factor(booking_status))) + geom_bar() + 
+  labs(x = "Кількість дітей", y = "Кількість записів", fill = "Статус бронювання") + 
+  scale_x_continuous(breaks = seq(0, max(hotel$no_of_children), by = 1)) +
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 1)) +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
+                    labels = c("Відмінено", "Не відмінено"))
+
+ggplot(hotel, aes(x = no_of_children, fill = as.factor(booking_status))) + geom_bar(position = "fill") + 
+  scale_x_continuous(breaks = seq(0, max(hotel$no_of_children), by = 1)) +
+  labs(x = "Кількість дітей", y = "Частка", fill = "Статус бронювання") +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
+                    labels = c("Відмінено", "Не відмінено"))
 ```
 
+##### Можна побачити, що з дітьми приблизно така ж ситуація, якщо дітей до 3 включно. Тобто, якщо дітей до трьох включно, то статус бронювання пропорційно однаково розподілений - приблизно 35% записів буде відмінено. Для випадків коли дітей 9 чи 10 ситуація трохи відрізняється, але це дуже поодинокі випадки:
+
 ```{r}
-# ВСЕ для 4
-ggplot(hotel, aes(x = avg_price_per_room, y = no_of_week_nights) ) + geom_point()
+hotel %>% group_by(no_of_children) %>% 
+  summarise(total = n()) %>%
+  filter(no_of_children >= 9)
+```
 
-ggplot(hotel, aes(x = avg_price_per_room, y = no_of_weekend_nights) ) + geom_point()
+##### Також зробимо аналогічні графіки для кількості "типів сімей" (кількість дорослих - кількість дітей), відзначивши кольором статус бронювання записів
 
-ggplot(hotel_with_nights, aes(x = no_of_nights, fill = as.factor(room_type_reserved))) + geom_bar(position = "fill")
+```{r}
+ggplot(hotel_grouped_by_bs, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = booking_status)) + 
+  geom_bar(stat = "identity") +
+  labs(x = "Пара (дорослі, діти)", y = "Кількість записів", fill = "Статус бронювання") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
+                    labels = c("Відмінено", "Не відмінено"))
 
-hotel_with_nights <- hotel_with_nights %>% filter(avg_price_per_room > 20)
 
-hotel_with_nights <- hotel_with_nights %>% filter(avg_price_per_room > 9)
+ggplot(hotel_grouped_by_bs, aes(x = reorder(pair, (no_of_adults + no_of_children)), y = total, fill = booking_status)) + 
+  geom_bar(stat = "identity", position = "fill") +
+  labs(x = "Пара (дорослі, діти)", y = "Частка", fill = "Статус бронювання") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
+                    labels = c("Відмінено", "Не відмінено"))
+```
+
+##### Спостерігаємо схожу ситуацію: для найпопулярніших "типів" сімей приблизно 25-35% записів скасовані. У поодиноких випадках ситуація не така стабільна.
+
+
+#### ЧЕТВЕРТЕ ЗАПИТАННЯ
+
+#### Формулювання:
+- Що впливає на кількість проведених вихідних та робочих ночей у готелі?
+
+##### Перше, що спадає на думку перевірити, це чи не є у вихідні середня ціна більшою, ніж у будні:
+```{r}
+ggplot(hotel, aes(x = avg_price_per_room, y = no_of_week_nights) ) + geom_point(alpha = 0.5) +
+  labs(x = "Ціна за номер",
+       y = "Кількість будніх ночей") + theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(hotel, aes(x = avg_price_per_room, y = no_of_weekend_nights) ) + geom_point(alpha = 0.5) +
+  labs(x = "Ціна за номер",
+       y = "Кількість  вихідних ночей") + theme(plot.title = element_text(hjust = 0.5))
+```
+##### Як бачимо, графіки, грубо кажучи, є однаковими: графік для кількості будніх ночей є "плотнішим" (насиченішим), в силу того, що кількість будніх більша за кількість вихідних.
+
+##### Для більш наглядної демонстрації цього висновку збудуємо відповідні вусаті скриньки:
+```{r}
+ggplot(hotel_zero_nights, aes(x = as.factor(no_of_weekend_nights), y = avg_price_per_room)) + geom_violin() + stat_summary(fun = mean, geom="point", shape=23, size=2) + geom_boxplot(width=0.1) +
+  labs(title = "Середня ціна за номер в залежності від кількості  вихідних ночей",
+       x = "Кількість  вихідних ночей",
+       y = "Ціна за номер") + theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(hotel_zero_nights, aes(x = as.factor(no_of_week_nights), y = avg_price_per_room)) + geom_violin() + stat_summary(fun = mean, geom="point", shape=23, size=2) + geom_boxplot(width=0.1) +
+labs(title = "Середня ціна за номер в залежності від кількості будніх ночей",
+     x = "Кількість будніх ночей",
+     y = "Ціна за номер") + theme(plot.title = element_text(hjust = 0.5))
+```
+##### Можемо побачити, що за будь-якої кількості будніх/вихідних зарезервованих ночей, ціна є приблизно однаковою і не зазнає змін
+
+##### Подивимось, чи залежить явним чином кількість заброньованих ночей (будніх+вихідних) від типу кімнати:
+```{r}
+ggplot(hotel_with_nights, aes(x = avg_price_per_room, y = no_of_nights, color = as.factor(room_type_reserved))) +
+  geom_point() +
+  labs(title = "Залежність ціни за номер від кількості ночей та типу кімнати",
+       x = "Ціна за номер",
+       y = "Загальна кількість ночей",
+       color = "Тип кімнати")+
+  scale_color_manual(name = "Тип кімнати",
+                values = room_type_vector,
+                labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+```
+
+##### Як бачимо, можна відмітити, що 
+- від 15 до 25 днів, здебільшого резервування припадають на 1 та 4 типи кімнат.
+- тип кімнати 6 обирають не більше, ніж на 2 тижні
+- 7-ий тип кімнати обирають здебільшого на термін перебування ~тиждень
+
+
+##### Розглянемо у більш зрозуміло вигляді яка частка яких типів кімнат припадає на кожне число загальної кількості заброньованих ночей:
+```{r}
+ggplot(hotel_with_nights, aes(x = no_of_nights, fill = as.factor(room_type_reserved))) + geom_bar(position = "fill") +
+  labs(
+       x = "Загальна кількість ночей",
+       y = "Частота",) +
+  scale_fill_manual(name = "Тип кімнати",
+                  values = room_type_vector,
+                  labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+```
+##### як бачимо - дійсно, попередні висновки підтвердилися
+
+##### Цікаво було б дізнатися яким саме чином розподіляється середня ціна для різних діапазонів кількості заброньованих ночей
+##### Відклавши на вісі іксів прологарифмовану ціну, а на вісі ігриків - щільність, та позначивши діапазони кількості ночей відповідними кольорами, можемо спостерігати досить цікавий результат:
+```{r}
 ggplot(hotel_with_nights, aes(x = log(avg_price_per_room), y = after_stat(density), 
-                                  color = cut(no_of_nights, breaks = seq(min(no_of_nights), max(no_of_nights), by = 5)))) + geom_freqpoly(bins = 30) +
+                                  color = cut(no_of_nights, breaks = seq(min(no_of_nights), max(no_of_nights), by = 5)))) +     geom_freqpoly(bins = 30) +
     labs(x = "Логарифмована ціна, $", y = "Щільність", color = "Кількість ночей") +
       theme(axis.title = element_text(size = 25),
             axis.text = element_text(size = 20),
             legend.title = element_text(size = 25),
-            legend.text = element_text(size = 20))
+            legend.text = element_text(size = 20)) + theme(plot.title = element_text(hjust = 0.5))
+```
+##### наведений графік дуже нагадує нормальний розподіл, тож, можна припустити, що оригінальне значення ціни матиме логнормальний розподіл, але це припущення потребує подальшої перевірки
 
-hotel_with_nights <- hotel_with_nights %>%
-  mutate(lead_time = ifelse(lead_time == 0, 1, lead_time))
-
-
-ggplot(hotel_with_nights, aes(x = log(lead_time), y = after_stat(density), 
+##### якщо побудувати аналогічний графік, взявши, наприклад, на вісі іксів прологарифмований час до прибуття, то нічого визначного побачити не вдасться:
+```{r}
+ggplot(hotel_lead_check, aes(x = log(lead_time), y = after_stat(density), 
                               color = cut(no_of_nights, breaks = c(0, 5, 10, 15, 20, max(no_of_nights) + 1)
-                                          ))) + geom_freqpoly(bins = 20) +
-  labs(x = "Логарифм. час до прибуття, $", y = "Щільність", color = "Кількість ночей") +
+                                          ))) + geom_freqpoly(bins = 15) +
+  labs(x = "Логарифм. час до прибуття, год", y = "Щільність", color = "Кількість ночей") +
       theme(axis.title = element_text(size = 25),
             axis.text = element_text(size = 20),
             legend.title = element_text(size = 25),
-            legend.text = element_text(size = 20))
-  
-
-ggplot(hotel_with_nights, aes(x = no_of_nights, fill = as.factor(no_of_children))) + geom_bar()
-ggplot(hotel_with_nights, aes(x = no_of_nights, fill = as.factor(no_of_children))) + geom_bar(position = "fill")
-
-hotel_cum <- hotel_avg_prices %>% filter(no_of_weekend_nights == 0 | no_of_week_nights == 0)
-
-ggplot(hotel_cum, aes(x = as.factor(no_of_weekend_nights), y = avg_price_per_room)) + geom_violin() + stat_summary(fun = mean, geom="point", shape=23, size=2) + geom_boxplot(width=0.1)
-
-ggplot(hotel_cum, aes(x = as.factor(no_of_week_nights), y = avg_price_per_room)) + geom_violin() +  stat_summary(fun = mean, geom="point", shape=23, size=2) + geom_boxplot(width=0.1)
+            legend.text = element_text(size = 20)) + theme(plot.title = element_text(hjust = 0.5))
 ```
+
+##### Можливо, вплив на кількість заброньованих ночей може мати кількість дітей: це може бути сімейна відпустка, яка триватиме, умовно, тиждень або трохи більше і т.п.
+##### Побудуємо стовпчикові діаграми для кількості заброньованих ночей, відклавши на вісі ігриків кількості записів, що припадають на задану кількість заброньованих ночей, а кольорами позначимо записи з відповідною кількістю дітей:
+```{r}
+ggplot(hotel_lead_check, aes(x = no_of_nights, fill = as.factor(no_of_children))) + geom_bar() +
+  labs(x = "Загальна кількість ночей",
+       y = "Кількість записів",
+       fill = "Кількість дітей") + theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(hotel_lead_check, aes(x = no_of_nights, fill = as.factor(no_of_children))) + geom_bar(position = "fill") +
+  labs(x = "Загальна кількість ночей",
+       y = "Частка",
+       fill = "Кількість дітей") + theme(plot.title = element_text(hjust = 0.5))
+```
+##### як бачимо, досить часто діти прибувають на (одно/дво)тижневі "відпустки"
+##### також варто помітити кількість записів, що припадає на перші ~7 днів: серед великої сукупності записів дуже багато прибувших є виключно дорослими без дітей
+
+#### П'ЯТЕ ЗАПИТАННЯ
+
+#### Формулювання:
+- Як різні типи кімнат впливають на кількість попередніх скасувань/бронювань?
+
+##### Побудуємо стовпчикову діаграму: на вісі іксів позначимо типи зарезервованих кімнат від 1-ої до 7-ої, а на вісі ігриків відкладатимемо значення суми (кількість попередніх скасувань + кількість попередніх НЕскасувань), відзначивши відповідні кількості синім і червоним кольорами:
+```{r}
+hotel_long <- pivot_longer(hotel, cols = c(no_of_previous_cancellations, no_of_previous_bookings_not_canceled), names_to = "status", values_to = "count")
+
+ggplot(hotel_long, aes(x=room_type_reserved, fill=status, y=count))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(
+       x = "Тип кімнати",
+       y = "Кількість") +
+  scale_fill_manual(name = "Статус попередніх бронювань",
+                    values = c("no_of_previous_bookings_not_canceled" = "#00bfc4", "no_of_previous_cancellations" = "#f8766d"),
+                    labels = c("Не скасовано", "Скасовано"))+
+  scale_x_discrete(labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+```
+##### Як бачимо, в силу того, що певних типів кімнат (здебільшого Room_Type 1) резервувалося значно більше, ніж інших, то у такому вигляді графік не є особливо інформативним, тому нормуємо значення ігриків таким чином, щоб для кожного типу кімнати стовпець відображав частки кількостей попередніх скасувань і НЕскасувань:
+```{r}
+ggplot(hotel_long, aes(x=room_type_reserved, fill=status, y=count))+
+  geom_bar(stat = "identity", position = "fill")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(x = "Тип кімнати",
+       y = "Частка") +
+  scale_fill_manual(name = "Статус попередніх бронювань",
+                    values = c("no_of_previous_bookings_not_canceled" = "#00bfc4", "no_of_previous_cancellations" = "#f8766d"),
+                    labels = c("Не скасовано", "Скасовано"))+
+  scale_x_discrete(labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+```
+
+##### Як можна бачити з наведених двох графіків вище, типи кімнат, які бронювали частіше (1, 4, 7), мають більшу кількість попередніх скасувань ніж інші 4 типи.
+##### Найкращою за кількістю попередніх НЕскасувань є кімната другого типу, яку забронювали відносно немалу кількість разів (а саме 692):
+```{r}
+table(hotel$room_type_reserved)
+```
+
+
+#### ШОСТЕ ЗАПИТАННЯ
+
+#### Формулювання:
+- Чи є різниця в кількості попередніх скасувань для клієнтів, які вимагають паркувальне місце і тих, хто його не потребує?
+
+##### Спочатку, подивимось на кількість скасованих/нескасованих бронювань в залежності від потреби у паркувальному місці у вигляді таблиці:
+```{r}
+cont_tab <- xtabs(~ required_car_parking_space + booking_status, data = hotel)
+cont_tab
+```
+##### Одразу кидається в очі те, що люди, яким необхідне паркувальне місце, рідше скасовують бронювання. Це питання потребує детальнішого вивчення: з одногу боку це досить природньо - якщо людина завчасно говорить за паркувальне місце, вона, напевно, вже достатньо спланувала свій візит до готелю, з іншого - можливо є інші фактори які на це впливають
+
+##### Подивимось на цей же результат у графічному вигляді: побудуємо стовпчикову діаграму на основі даних про потребу в паркувальному місці, розфарбуємо в різні кольори записи, які відповідно були скасовані і не скасовані. 
+```{r}
+ggplot(hotel, aes(x = as.factor(required_car_parking_space), fill = booking_status)) +
+  geom_bar(position = "fill") +
+  labs(title = "Ті, кому потрібно паркуватися, рідше відміняють бронювання",
+       x = "Потреба у паркувальному місці",
+       y = "Частка") +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Not_Canceled" = "#00bfc4", "Canceled" = "#f8766d"),
+                    labels = c("Відмінено", "Не відмінено"))+
+  scale_x_discrete(labels = c("Не потрібне", "Потрібне")) + theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+## інше
+##### Таблиця статусу бронювання в залежності від його типу і обернена до неї. Найбільше записів зроблено онлайн, більша частина з них - скасовані; загалом скасовані записи складають приблизно 30% від всіх записів.
+```{r margin2}
+addmargins(cont_tab <- xtabs(~ market_segment_type + booking_status, data = hotel))
+addmargins(cont_tab <- xtabs(~ booking_status + market_segment_type, data = hotel))
+```
+
+##### Таблиця залежності кількості особливих побажань від кількості дітей. Можемо побачити, що кількість особливих побажань не залежить від кількості дітей явно.
+```{r margin3}
+addmargins(cont_tab <- xtabs(~ no_of_children + no_of_special_requests, data = hotel))
+```
+
+##### Таблиця залежності типу кімнати від типу плану харчування. Перший план харчування найпопулярніший, третій план майже не вибирали
+```{r margin5}
+addmargins(cont_tab <- xtabs(~ type_of_meal_plan + room_type_reserved, data = hotel))
+```
+
+##### Гістограма кількості ночей, що гості планували провести в готелі. Як бачимо, люди частіше залишаються в готелі до 5 ночей, далі записів стає значно менше.
+```{r geombar}
+ggplot(hotel_with_nights, aes(x = no_of_nights)) +
+  geom_bar() +
+  theme_classic() + labs(
+       x = "Кількість ночей",
+       y = "Кількість записів")
+```
+##### 
+#### Графік qqnorm для ціни за кімнату. Можна побачити викид зверху, вже було згадано, що це, ймовірно, одруківка, і багато записів з 0 значеннями - договірна ціна
+```{r avg_price qqnorm}
+qqnorm(hotel$avg_price_per_room, main = 'Normal Q-Q Plot для ціни за кімнату')
+  
+```
+
+#### гістограми
+##### Гістограма для дати прибуття в готель. Очевидно, менше записів на 31 число - не кожен місяць має його. 
+```{r hist1}
+hotel_cusn <- hotel %>% 
+  group_by(arrival_date) %>% 
+  summarise(total = n())
+
+ggplot(hotel_cusn, aes(x = arrival_date, y = total)) +
+  geom_segment(aes(x = arrival_date, xend = arrival_date, y=total, yend=0)) +
+  geom_point(color = 'red', size = 3) + labs(x = "Дата прибуття", y = "Кількість записів")
+```
+
+#### вусаті скриньки
+#### Наведені вусаті скриньки залежності ціни від типів кімнати, плану харчування, кількості дорослих та дітей. Як бачимо, тип кімнати  помітно впливає на ціну, так само і кількість дорослих і кількість дітей. Проте, важко сказати для плану харчування - не так багато записів для 2 і 3 типів.
+```{r boxplots}
+ggplot(hotel, aes(x = room_type_reserved, y = avg_price_per_room)) +
+  geom_boxplot(varwidth = FALSE) + labs (x = "Тип кімнати", y = "Ціна за кімнату") +
+  scale_x_discrete(labels = room_label_vector)
+
+ggplot(hotel, aes(x = factor(no_of_adults), y = avg_price_per_room)) +
+  geom_boxplot(varwidth = FALSE) + labs(x = "Кількість дорослих", y = "Ціна за кімнату")
+   
+
+ggplot(hotel, aes(x = factor(no_of_children), y = avg_price_per_room)) +
+  geom_boxplot(varwidth = FALSE) + labs(x = "Кількість дітей", y = "Ціна за кімнату")
+
+ggplot(hotel, aes(x = type_of_meal_plan, y = avg_price_per_room)) +
+  geom_boxplot(varwidth = FALSE) + labs(x = "Тип харчування", y = "Ціна за кімнату") + 
+  scale_x_discrete(labels = meal_label_vector)
+```
+
+##### Прологаритмуємо ціну для вусатої скриньки залежності ціни від кількості дорослих, щоб краще побачити відмінності. Видно, що ціни для 3 і 4 дорослих значно відрізняються.
+```{r boxplot log}
+
+ggplot(hotel_lead_check, aes(x = factor(no_of_adults), y = log(avg_price_per_room))) +
+  geom_boxplot(varwidth = FALSE) + labs(x = "Кількість дорослих", y = "Ціна за кімнату") 
+```
+
+#### стовпчикові діаграми
+
+##### Побудуємо стовпчикову діаграму для кількості попередніх НЕскасованих бронювань, відмітимо кольором необхідність у паркувальному місці. Складно побачити якісь закономірності, так як існує дуже мало записів, де кількість попередніх НЕскасувань більше 0
+```{r}
+
+ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = required_car_parking_space)) +
+  geom_bar() + labs( x = "Кількість попередніх не скасованих бронювань", y = "Кількість записів", fill = "Необхідність в паркувальному місці")
+
+ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = required_car_parking_space)) +
+  geom_bar(position = 'fill') + labs( x = "Кількість попередніх не скасованих бронювань", y = "Частка записів", fill = "Необхідність в паркувальному місці")
+```
+
+##### Окрім цього, побудуємо стовпчикову діаграму для кількості попередніх скасованих бронювань, відмітимо кольором необхідність у паркувальному місці. Складно побачити якісь закономірності з аналогічних причин
+```{r}
+ggplot(hotel, aes(x = no_of_previous_cancellations, fill = required_car_parking_space)) +
+  geom_bar() + labs( x = "Кількість скасованих бронювань", y = "Кількість записів", fill = "Необхідність в паркувальному місці")
+
+ggplot(hotel, aes(x = no_of_previous_cancellations, fill = required_car_parking_space)) +
+  geom_bar(position = 'fill') + labs( x = "Кількість скасованих бронювань", y = "Частка записів", fill = "Необхідність в паркувальному місці")
+```
+
+
+##### Побудуємо стовпчикові діаграми для кількості попередніх НЕскасованих бронювань і статусу бронювань, кольором відмітимо повторних гостей.
+- Можемо побачити, що повторний гість має більше попередніх нескасованих бронювань, що не дивно
+- Повторні гості частіше не скасовують бронювання
+```{r}
+ggplot(hotel, aes(x = no_of_previous_bookings_not_canceled, fill = as.factor(repeated_guest))) +
+  geom_bar() + labs( x = "Кількість попередніх не скасованих бронювань", y = "Кількість записів") + scale_fill_manual(name = "Повторний гість",
+                    values = c("0" = "#00bfc4", "1" = "#f8766d"),
+                    labels = c("Ні", "Так"))
+
+ggplot(hotel, aes(x = booking_status, fill = repeated_guest)) +
+  geom_bar(position = "dodge") + labs( x = "Статус бронювання", y = "Кількість записів") + scale_fill_manual(name = "Повторний гість",
+                    values = c("0" = "#00bfc4", "1" = "#f8766d"),
+                    labels = c("Ні", "Так")) +
+  scale_x_discrete(labels = c("Canceled" = "Скасовано", "Not_Canceled" = "Не скасовано"))
+```
+
+##### Побудуємо графік кількості записів в залежності від дати прибуття, і порівняємо його з графіком залежності ціни від дати прибуття. 
+##### Можна побачити схожі тенденції - взимку 2017-2018 року було менше записів, і як наслідок, бачимо падіння і ціни. І навпаки, коли записів стає більше - влітку 2018 року, ціна також зростає.
+```{r some freqpoly}
+ggplot(hotel, aes(x = as.Date(arrival_year_and_month))) +
+  geom_freqpoly(bins = 50) + labs( x = "Дата прибуття РРРР:ММ", y = "Кількість записів")
+
+ggplot(hotel, aes(x = as.Date(arrival_year_and_month), y = avg_price_per_room)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth() + labs( x = "Дата прибуття РРРР:ММ", y = "Ціна за кімнату")
+
+ggplot(hotel_avg_prices, aes(x = as.Date(arrival_year_and_month), y = avg_price_per_room)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth() + labs( x = "Дата прибуття РРРР:ММ", y = "Ціна за кімнату")
+
+```
+
+##### Побудуємо стовпчикову діаграму для типів зарезервованих кімнат, кольором відмітимо статус бронювання. Можна сказати, що статус бронювання розподілений приблизно рівномірно.
+```{r}
+ggplot(hotel, aes(x = room_type_reserved, fill = booking_status)) + geom_bar(position = "fill") +
+  labs(x = "Тип зарезервованої кімнати", y = "Частка", fill = "Статус бронювання") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Canceled" = "#f8766d", "Not_Canceled" = "#00bfc4"),
+                    labels = c("Скасовано", "Не скасовано"))+
+  scale_x_discrete(labels = room_label_vector) + theme(plot.title = element_text(hjust = 0.5))
+```
+
+##### додаткові типи графіків) візуалізація кількості зарезервованих кімнат різних типів
+```{r additional graphs}
+bar <- ggplot(data = hotel) +
+  geom_bar(
+    mapping = aes(x = room_type_reserved, fill = room_type_reserved),
+    show.legend = FALSE,
+    width = 1
+  ) +
+  theme(aspect.ratio = 1) +
+  labs(x = NULL, y = NULL) + scale_x_discrete(labels = room_label_vector)
+
+bar + coord_flip()
+bar + coord_polar()
+```
+
+##### Графік, що показує як впливає час до прибуття на статус бронювання. Можемо побачити, що починаючи з часу приблизно в 90 годин, люди починають частіше скасовувати записи, ніж не скасовувати.
+```{r some geom_density}
+ggplot(hotel, aes(x=lead_time, fill=booking_status))+
+  geom_density(alpha=0.5) + labs( x = "Час до прибуття", y = "Щільність") +
+  scale_fill_manual(name = "Статус бронювання",
+                    values = c("Canceled" ="#f8766d", "Not_Canceled" = "#00bfc4"),
+                    labels = c( "Скасовано",  "Не скасовано"))
+```
+
+##### Violin-графік для тих же величин
+```{r violin c:}
+ggplot(hotel, aes(x=booking_status, y=lead_time))+
+  geom_violin(fill = "skyblue", color = "darkblue", alpha = 0.8)+
+  scale_x_discrete(labels = c("Відмінено", "Не відмінено"))+
+  labs(x="Статус бронювання",
+       y="Час від бронювання до прибуття")
+```
+
+#### Графік залежності середньої ціни за кімнату в залежності від часу прибуття. 
+##### Можемо побачити, що 
+- скасовані записи зазвичай дорожче,
+- чим більше час до прибуття - тим, в середньому, менше ціна.
+```{r idk1}
+ggplot(data = hotel, aes(x = lead_time, y = avg_price_per_room, color = booking_status)) +
+  geom_smooth() + labs (x = "Час до прибуття", y = "Ціна за кімнату") +
+  scale_color_manual(name = "Статус бронювання",
+                    values = c("Canceled" ="#f8766d", "Not_Canceled" = "#00bfc4"),
+                    labels = c( "Скасовано",  "Не скасовано"))
+```
+
+#### кореляція
+##### Як можна бачити, особливо сильної кореляції між змінними немає
+```{r corr1}
+ggcorr(hotel_corr %>% select(where(is.numeric)), label = TRUE)
+```
+
+##### Якщо і тому числі розглядати факторні змінні, можемо побачити дуже сильну кореляцію між тим, що попередні записи не були скасовані і це повторний гість. Але в даній кореляції немає нічого незвичайного, очевидно, якщо людина повторний гість - вона не відміняла попередні записи.
+```{r corr2}
+ggcorr(hotel_corr %>% select(where(is.numeric)), label = TRUE,
+       method = c("pairwise", "spearman"))
+```
+
+#### побудова qq-графіків
+
+##### Спершу побудуємо qqnorm-графік для часу до прибуття. Можемо побачити, що в нас дуже багато записів з 0 часом до прибуття. Такий викид тривіально пояснюється, точно є люди які як тільки прийшли одразу і поселилися.
+```{r}
+qqnorm(hotel$lead_time, main = 'Normal Q-Q Plot для часу до прибуття')
+```
+##### Порівняємо його з нормальним розподілом. Бачимо, що розподіл часу не є нормальним
+
+
+```{r log1}
+ggplot(hotel_sliced, aes(sample = lead_time)) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band() + labs (x = "Квантилі нормального розподілу", y = "Час до прибуття")
+```
+##### Логаритмування часу до прибуття не сильно скрашує отриманий результат
+```{r log3}
+ggplot(hotel_sliced, aes(sample = log(lead_time))) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band() + labs (x = "Квантилі нормального розподілу", y = "Час до прибуття")
+```
+
+##### Побудуємо такий самий графік для ціни. Спостерігаємо викиди з дуже великою або низькою цінами, але, як було пояснено раніше, ці ціни цілком нормальні.
+```{r (not log) 2}
+ggplot(hotel_sliced, aes(sample = avg_price_per_room)) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band() + labs (x = "Квантилі нормального розподілу", y = "Ціна за кімнату, $")
+```
+
+##### Якщо прологаритмуємо ціну - побачимо, що її розподіл стає досить схожим на нормальний, що є хорошим показником
+```{r}
+ggplot(hotel_sliced, aes(sample = log(avg_price_per_room))) +
+  stat_qq_point() + stat_qq_line() + stat_qq_band() + labs(x = "Квантилі нормального розподілу", y = "Ціна за кімнату, $")
+```
+
+#### Висновки
+- Датасет був представлений в охайному вигляді, а знайдені викиди існують у незначній кількості та не мали впливу на подальші результати дослідження.
+
+##### У підсумку команда дійшла до наступних висновків щодо дослідницьких питань:
+- 1 - явний вплив типу кімнати на кількість дорослих/дітей - відсутній. Незалежно від кількості дорослих, найбільшу перевагу віддають типу харчування BB, двоє дорослих частіше не обирають тип харчування, ніж один або троє. Також видно, що зі збільшенням кількості дітей (від одного до трьох), зростає частка бронювань, де обрано тип харчування BB.
+- 2 - зі збільшенням кількості особливих побажань, має тенденцію збільшуватися частка дорожчих типів кімнат. Можливо, такий результат можна пов'язаний з тим, що у людей які мають гроші на кращі апартаменти, є гроші і на певні додаткові особливі побажання.
+- 3 - статус бронювання практично не змінюється від кількості дорослих. З кількістю дітей (до 3 включно) ситуація аналогічна. Випадки з кількістю дітей > 3 є поодинокими, через що на них не має сенсу загострювати увагу. Для найпопулярніших "типів" сімей ((1 дорослий без дітей), (2 дорослих без дітей), (2 дорослих з 1-2 дітьми) і (3 дорослих без дітей)) приблизно 25-35% записів скасовані, а у поодиноких випадках ситуація не така стабільна.
+- 4 - ціна не має впливу на кількість проведених вихідних та робочих ночей у готелі, проте цей вплив мають тип заброньованої кімнати та кількість дітей: на різні терміни перебування (до 1 тижня, до 2 тижнів, більше ніж на 2 тижні) обирають 7, 6 та 1 типи кімнат, та заселяються з 1, 2 та 0 дітьми відповідно. Щільність ціни по діапазонам кількості заброньованих ночей візуально нагадує логнормальний розподіл.
+- 5 - типи кімнат, які, незалежно від їх ціни, бронювали частіше (1, 4, 7), мають більшу кількість попередніх скасувань ніж інші 4 типи. Кімната другого типу може похизуватися кількістю попередніх НЕскасувань - 692 (що становить майже 100% випадків заселення)
+- 6 - люди, яким необхідне паркувальне місце, рідше скасовують бронювання. Це питання потребує детальнішого вивчення: з одногу боку це досить природньо - якщо людина завчасно говорить за паркувальне місце, вона, напевно, вже достатньо спланувала свій візит до готелю, з іншого - можливо є інші фактори які на це впливають
+
+##### Таким чином, деякі запитання пролили світло на ряд нових запитань і закономірностей, які потребують подальшої перевірки на спростування/підтвердження, а деякі - не мали помітних зв'язків між змінними і відповідно не дали очікуваних результатів.
+##### З цього випливає необхідність проведення глибшого аналізу над цими даними.
