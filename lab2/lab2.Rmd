@@ -16,7 +16,7 @@ library(boot)
 set.seed(100)  # для повторюваности
 ```
 
-```{r}
+```{r, include=FALSE}
 original_hotel <- read.csv("Hotel Reservations.csv")
 
 hotel_corr <- original_hotel
@@ -673,8 +673,8 @@ p_value <- 2 * pnorm(abs(T), lower.tail = FALSE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Requests):", mean_hat_req, "\n")
-cat("Mean (No Requests):", mean_hat_no_req, "\n")
+cat("Mean (With requests):", mean_hat_req, "\n")
+cat("Mean (Without requests):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
@@ -704,8 +704,8 @@ p_value <- 2 * pnorm(abs(T), lower.tail = FALSE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Requests):", mean_hat_req, "\n")
-cat("Mean (No Requests):", mean_hat_no_req, "\n")
+cat("Mean (With requests):", mean_hat_req, "\n")
+cat("Mean (Without requests):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
@@ -754,8 +754,8 @@ p_value <- pnorm(T, lower.tail = TRUE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Requests):", mean_hat_req, "\n")
-cat("Mean (No Requests):", mean_hat_no_req, "\n")
+cat("Mean (With requests):", mean_hat_req, "\n")
+cat("Mean (Without requests):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
@@ -916,8 +916,8 @@ p_value <- pnorm(T, lower.tail = TRUE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Requests):", mean_hat_req, "\n")
-cat("Mean (No Requests):", mean_hat_no_req, "\n")
+cat("Mean (Canceled):", mean_hat_req, "\n")
+cat("Mean (Not canceled):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
@@ -946,6 +946,9 @@ ci
 
 ##### Протестуємо досить примітивну гіпотезу про те, що в середньому на нескасованих бронюваннях час до прибуття є більшим, ніж у скасованих (це може бути цікаво з тієї точки зору, що інтуїтивно можливо у тих, хто відміняє бронювання, відбуваються неочікувані зміни планів, а зазвичай бронювання роблять приблизно за 5-7 днів до прибуття як спланований візит на визначений термін):
 ```{r}
+#ті хто не відмінили прибувають пізніше ніж ті що відмінили
+t.test(lead_time ~ booking_status_binary, data = hotel_reverse, alternative = "less")
+
 estimates <- hotel_reverse %>%
   group_by(booking_status_binary) %>%
   summarise(mean_hat = mean(lead_time),
@@ -964,14 +967,11 @@ p_value <- pnorm(T, lower.tail = TRUE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Requests):", mean_hat_req, "\n")
-cat("Mean (No Requests):", mean_hat_no_req, "\n")
+cat("Mean (Canceled):", mean_hat_req, "\n")
+cat("Mean (Not canceled):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
-
-#ті хто не відмінили прибувають пізніше ніж ті що відмінили
-t.test(lead_time ~ booking_status_binary, data = hotel_reverse, alternative = "less")
 
 ci <- hotel %>%
   filter(booking_status == "Not_Canceled") %>%
@@ -1444,8 +1444,8 @@ p_value <- 2 * pnorm(abs(T), lower.tail = FALSE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Needed):", mean_hat_req, "\n")
-cat("Mean (Not needed):", mean_hat_no_req, "\n")
+cat("Mean (Required):", mean_hat_req, "\n")
+cat("Mean (Not required):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
@@ -1552,8 +1552,8 @@ p_value <- pnorm(T, lower.tail = TRUE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Needed):", mean_hat_req, "\n")
-cat("Mean (Not needed):", mean_hat_no_req, "\n")
+cat("Mean (Required):", mean_hat_req, "\n")
+cat("Mean (Not required):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
@@ -1617,8 +1617,8 @@ p_value <- 2 * pnorm(abs(T), lower.tail = FALSE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Requests):", mean_hat_req, "\n")
-cat("Mean (No Requests):", mean_hat_no_req, "\n")
+cat("Mean (Repeated guest):", mean_hat_req, "\n")
+cat("Mean (Not repeated guest):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
@@ -1667,8 +1667,8 @@ p_value <- 2 * pnorm(abs(T), lower.tail = FALSE)
 
 conf.int <- c(mean_hat_no_req - mean_hat_req - qnorm(0.975) * se, mean_hat_no_req - mean_hat_req + qnorm(0.975) * se)
 
-cat("Mean (Requests):", mean_hat_req, "\n")
-cat("Mean (No Requests):", mean_hat_no_req, "\n")
+cat("Mean (Repeated guest):", mean_hat_req, "\n")
+cat("Mean (Not repeated guest):", mean_hat_no_req, "\n")
 cat("T-statistic:", T, "\n")
 cat("P-value:", p_value, "\n")
 cat("95% Confidence Interval:", conf.int, "\n")
