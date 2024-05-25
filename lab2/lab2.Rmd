@@ -195,7 +195,8 @@ ci_adults_children <- hotel %>%
 ggplot(ci_adults_children, aes(x = room_type_reserved, y = mean_adults, color = type_of_meal_plan)) +
   geom_point(position = position_dodge(width = 0.5)) +
   geom_errorbar(aes(ymin = ci_low_adults, ymax = ci_high_adults), width = 0.2, position = position_dodge(width = 0.5)) +
-  labs(title = "Кількість дорослих в залежності від типу номеру та плану харчування", x = "Тип номеру", y = "Середня кількість дорослих") +
+  labs(title = "Середня кількість дорослих в залежності від 
+       типу номеру та плану харчування", x = "Тип номеру", y = "Середня кількість дорослих") +
   theme_minimal()+
   scale_color_manual(name = "Тип плану харчування",
                      values = meal_type_vector,
@@ -208,7 +209,7 @@ ggplot(ci_adults_children, aes(x = room_type_reserved, y = mean_adults, color = 
 ggplot(ci_adults_children, aes(x = room_type_reserved, y = mean_children, color = type_of_meal_plan)) +
   geom_point(position = position_dodge(width = 0.5)) +
   geom_errorbar(aes(ymin = ci_low_children, ymax = ci_high_children), width = 0.2, position = position_dodge(width = 0.5)) +
-  labs(title = "Кількість дітей в залежності від типу номеру та плану харчування", 
+  labs(title = "Середня кількість дітей в залежності від типу номеру та плану харчування", 
        x = "Тип номеру", 
        y = "Середня кількість дітей", 
        color = "Тип плану харчування") +
@@ -224,6 +225,10 @@ ggplot(ci_adults_children, aes(x = room_type_reserved, y = mean_children, color 
 
 - В цілому, середня кількість дорослих варіюється від 1.5 до 2.5 для різних типів номерів та планів харчування.Кількість дорослих значно варіюється в залежності від типу номеру та плану харчування. Деякі типи номерів можуть приваблювати більше дорослих через специфічні умови або зручності, що надаються. Наприклад, номери типу Room_Type 7 з планом харчування Meal Plan 1 мають найвищу середню кількість дорослих, що може свідчити про те, що ці номери і план харчування задовольняють потреби більших груп дорослих.
 
+
+```{r}
+hotel %>% filter(type_of_meal_plan=='Meal Plan 3')
+```
 
 ##### 2 Графік
 
@@ -256,7 +261,7 @@ ci_df <- bind_rows(cis, .id = "Room_Type")
 ggplot(ci_df, aes(x = Room_Type, y = mean)) +
   geom_point() +
   geom_errorbar(aes(ymin = a, ymax = b), width = 0.2) +
-  labs(x = "Тип кімнати", y = "Кількість дорослих", title = "В кімнатах 4, 6, 7 дещо більше дорослих ніж в інших") +
+  labs(x = "Тип кімнати", y = "Середня кількість дорослих", title = "В кімнатах 4, 6, 7 в середньому дещо більше дорослих ніж в інших") +
   ylim(0, NA) +
   scale_x_discrete(labels = room_label_vector)+
   theme(axis.text.x = element_text(angle = 20, hjust = 0.5), plot.title = element_text(hjust = 0.5))
@@ -328,7 +333,7 @@ ci_df <- bind_rows(cis, .id = "Room_Type")
 ggplot(ci_df, aes(x = Room_Type, y = mean)) +
   geom_point() +
   geom_errorbar(aes(ymin = a, ymax = b), width = 0.2) +
-  labs(x = "Тип кімнати", y = "Кількість дітей", title = "В 2 і 7 більше дітей ніж в інших, в 6 - значно більше") +
+  labs(x = "Тип кімнати", y = "Середня кількість дітей", title = "В 2 і 7 в середньому більше дітей ніж в інших, в 6 - значно більше") +
   ylim(0, NA) +
   scale_x_discrete(labels = room_label_vector)+
   theme(axis.text.x = element_text(angle = 20, hjust = 0.5), plot.title = element_text(hjust = 0.5))
@@ -360,7 +365,7 @@ ci_df <- bind_rows(cis, .id = "Room_Type")
 ggplot(ci_df, aes(x = Room_Type, y = mean)) +
   geom_point() +
   geom_errorbar(aes(ymin = a, ymax = b), width = 0.2) +
-  labs(x = "Тип кімнати", y = "Кількість людей", title = "В 6 і 7 типах набагато більше людей ніж в інших") +
+  labs(x = "Тип кімнати", y = "Середня кількість людей", title = "В 6 і 7 типах набагато більше людей ніж в інших") +
   ylim(0, NA) +
   scale_x_discrete(labels = room_label_vector)+
   theme(axis.text.x = element_text(angle = 20, hjust = 0.5), plot.title = element_text(hjust = 0.5))
@@ -405,7 +410,7 @@ ci_df <- bind_rows(cis, .id = "Meal_plan")
 ggplot(ci_df, aes(x = Meal_plan, y = mean)) +
   geom_point() +
   geom_errorbar(aes(ymin = a, ymax = b), width = 0.2) +
-  labs(x = "План харчування", y = "Кількість дорослих", title = "Приблизно однакова кількість для різних планів") +
+  labs(x = "План харчування", y = "Середня кількість дорослих", title = "Приблизно однакова кількість для різних планів") +
   ylim(0, NA) +
   scale_x_discrete(labels = meal_label_vector)+
   theme(axis.text.x = element_text(angle = , hjust = 0.5), plot.title = element_text(hjust = 0.5))
@@ -450,7 +455,7 @@ ci_df <- bind_rows(cis, .id = "Meal_plan")
 ggplot(ci_df, aes(x = Meal_plan, y = mean)) +
   geom_point() +
   geom_errorbar(aes(ymin = a, ymax = b), width = 0.2) +
-  labs(x = "План харчування", y = "Кількість дітей", title = "Трохи більше дітей для першого плану") +
+  labs(x = "План харчування", y = "Середня кількість дітей", title = "Трохи більше дітей для першого плану") +
   ylim(0, 1)  +
   scale_x_discrete(labels = meal_label_vector) +
   theme(axis.text.x = element_text(angle = , hjust = 0.5), plot.title = element_text(hjust = 0.5))
@@ -494,10 +499,20 @@ ci_df <- bind_rows(cis, .id = "Meal_plan")
 ggplot(ci_df, aes(x = Meal_plan, y = mean)) +
   geom_point() +
   geom_errorbar(aes(ymin = a, ymax = b), width = 0.2) +
-  labs(x = "План харчування", y = "Кількість людей", title = "Інтервали відрізняються не суттєво") +
+  labs(x = "План харчування", y = "Середня кількість людей", title = "Інтервали відрізняються несуттєво") +
   ylim(0, NA) +
   scale_x_discrete(labels = meal_label_vector)+
   theme(axis.text.x = element_text(angle = , hjust = 0.5), plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+booking_status_count <- hotel %>%
+  filter(lead_time >= 350) %>%
+  group_by(booking_status) %>%
+  summarize(count = n(), .groups = 'drop')
+
+# Print the result
+print(booking_status_count)
 ```
 
 ##### В цілому нічого нового спостерігати ми не можемо, дані результати є аналогом графіку для дорослих лише трохи більші показники за рахунок невеликих додаткових значень від дітей, незмінним залишається тільки Meal Plan 3 за рахунок того що там 0 інтервал для дітей
@@ -781,6 +796,12 @@ ci <- hotel %>%
 ci
 ```
 
+```{r}
+hotel %>% filter(no_of_children == 3)
+```
+
+
+
 ##### Бачимо, що знову p-value вийшло дуже малим, що означає, що ми не маємо підстав не відхилити нульову гіпотезу і відповідно можемо припускати, що люди, яким потрібні спеціальні запити, в середньому платять більше. За середніми значеннями бачимо, що група людей яким потрібні спеціальні запити в середньому платять на 11$ більше ніж люди яким спеціальні запити не потрібні.
 
 
@@ -1033,6 +1054,7 @@ ggplot(ci_df, aes(x = Booking_Status, y = mean)) +
 hotel <- hotel %>%
   mutate(no_of_nights = no_of_week_nights + no_of_weekend_nights)
 
+# Calculate confidence intervals for 'avg_price_per_room' grouped by 'no_of_nights'
 ci_special_requests <- hotel %>%
   group_by(no_of_nights) %>%
   summarize(mean_price = mean(avg_price_per_room),
@@ -1042,17 +1064,72 @@ ci_special_requests <- hotel %>%
             ci_high_price = mean(avg_price_per_room) + qnorm(0.975) * sd(avg_price_per_room) / sqrt(n_price),
             .groups = 'drop') # This will suppress the message
 
+# Print the result (optional)
 # print(ci_special_requests)
 
+# Plot the result
 ggplot(ci_special_requests, aes(x = no_of_nights, y = mean_price)) +
   geom_point() +
   geom_errorbar(aes(ymin = ci_low_price, ymax = ci_high_price), width = 0.2) +
-  labs(title = "Дуже маленька тенденція на зменшення ціни", x = "Кількість ночей", y = "Середня ціна за номер") +
-  theme_minimal()  +
+  geom_hline(yintercept = 105, linetype = "dashed", color = "red") +
+  labs(title = "~справжнє середнє значення ціни добре аппроксимує 
+       середні значення цін по кожному значенню кількості ночей",
+       x = "Кількість ночей",
+       y = "Середня ціна за номер") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+```{r}
+mean(hotel$avg_price_per_room)
+```
+
+### ТЕСТ
+```{r}
+price_range_by_room_type <- hotel %>%
+  filter(avg_price_per_room < 540) %>%
+  group_by(room_type_reserved) %>%
+  summarize(min_price = min(avg_price_per_room, na.rm = TRUE),
+            max_price = max(avg_price_per_room, na.rm = TRUE),
+            .groups = 'drop') # This will suppress the message
+
+# Print the result
+print(price_range_by_room_type)
+```
+
+```{r}
+hotel <- hotel %>%
+  mutate(no_of_nights = no_of_week_nights + no_of_weekend_nights)
+
+# Calculate confidence intervals for 'no_of_nights' grouped by 'room_type_reserved'
+ci_room_type_nights <- hotel %>%
+  group_by(room_type_reserved) %>%
+  summarize(mean_nights = mean(no_of_nights, na.rm = TRUE),
+            sd_nights = sd(no_of_nights, na.rm = TRUE),
+            n_nights = n(),
+            ci_low_nights = mean(no_of_nights, na.rm = TRUE) - qnorm(0.975) * sd(no_of_nights, na.rm = TRUE) / sqrt(n_nights),
+            ci_high_nights = mean(no_of_nights, na.rm = TRUE) + qnorm(0.975) * sd(no_of_nights, na.rm = TRUE) / sqrt(n_nights),
+            .groups = 'drop') # This will suppress the message
+
+# Print the result (optional)
+# print(ci_room_type_nights)
+
+# Plot the result
+ggplot(ci_room_type_nights, aes(x = room_type_reserved, y = mean_nights)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ci_low_nights, ymax = ci_high_nights), width = 0.2) +
+  labs(title = "Confidence Intervals for Average Number of Nights by Room Type",
+       x = "Room Type Reserved",
+       y = "Mean Number of Nights") +
+  theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
+
 ##### Як видно з малюнку, в очі нічого не кидається. Свого роду аномальність для останніх двох значень ночей пояснюється тим, що 23 проведеним ночам відповідає всього лише 2 записи, а 24 ночам - 1 запис. Загалом отримані значення досить непогано апроксимувалися б горизонтальною прямою, тож явного додатнього/від'ємного зв'язку між ціною і кількістю ночей не спостерігається.
+
+```{r}
+original_hotel %>% filter(room_type_reserved == 'Room_Type 3')
+```
 
 
 ##### Побудуємо довірчі інтервали для середніх значень кількості ночей по кожному типу кімнати:
@@ -1107,6 +1184,31 @@ ggplot(ci_df, aes(x = Room_Type, y = var)) +
 ```
 ##### В силу того, що довірчі інтервали для 3, 5 і 7 типів кімнат є досить широкими, то оцінити картину загалом не представляється можливим. Що можна помітити, так це відносно незначну різницю у значеннях довірчих інтервалів по типам кімнат 1, 2, 4 і 6, тож ніяким типам кімнат не надаватимемо перевагу у зручності/комфортності, які могли б вплинути на кількість проведених ночей.
 
+### ТЕСТ
+```{r}
+ci_nights_children <- hotel %>%
+  group_by(no_of_adults) %>%
+  summarize(mean_nights = mean(no_of_nights),
+            sd_nights = sd(no_of_nights),
+            n_nights = n(),
+            ci_low_nights = mean(no_of_nights) + qnorm(0.025) * sd(no_of_nights) / sqrt(n_nights),
+            ci_high_nights = mean(no_of_nights) + qnorm(0.975) * sd(no_of_nights) / sqrt(n_nights))
+
+# print(ci_nights_children)
+
+ggplot(ci_nights_children, aes(x = as.factor(no_of_adults), y = mean_nights)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ci_low_nights, ymax = ci_high_nights), width = 0.2) +
+  labs(title = "Середня кількість ночей відносно кількості дорослих", x = "Кількість дорослих", y = "Середня кількість ночей") +
+  theme_minimal() + theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+nrow(hotel %>% filter(repeated_guest != 0))
+```
+```{r}
+nrow(hotel %>% filter(repeated_guest == 0))
+```
 
 
 ##### Заради цікавості розглянемо довірчі інтервали для середньої кількості ночей по кожному значенню кількості дітей. Можливо сім'ї з дітьми планують заселятися на довший проміжок часу (щось типу сімейної подорожі на відпочинок)
