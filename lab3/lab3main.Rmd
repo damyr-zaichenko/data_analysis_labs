@@ -1,0 +1,365 @@
+---
+title: "lab3"
+output: html_document
+date: "2024-05-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(msm)
+library(tidyverse)
+library(latex2exp)
+library(gridExtra)
+library(lmtest)
+library(stargazer)
+library(car)
+library(margins)
+library(GGally)
+library(crch)
+library(multcomp)
+library(modelsummary)
+library(fixest)
+library(sandwich)
+set.seed(100)  # для повторюваности
+```
+
+```{r include=FALSE}
+original_hotel <- read.csv("Hotel Reservations.csv")
+
+kinda_iriginal_hotel <- original_hotel %>% mutate(no_of_people = no_of_adults + no_of_children)
+
+hotel_corr <- original_hotel
+
+hotel <- original_hotel %>% filter((avg_price_per_room > 9),
+                                   (no_of_children < 8))
+
+hotel <- hotel %>% mutate(repeated_guest = as.factor(repeated_guest), 
+                          required_car_parking_space = as.factor(required_car_parking_space),
+                          booking_status = as.factor(booking_status),
+                          room_type_reserved = as.factor(room_type_reserved),
+                          no_of_special_requests = ifelse(no_of_special_requests == 0, 0, 1),
+                          arrival_date_in_total = paste(arrival_year, arrival_month, arrival_date, sep = "-"),
+                          arrival_year_and_month = paste(arrival_year, arrival_month, sep = "-"),
+                          no_of_people = no_of_adults + no_of_children, 
+                          no_of_nights = no_of_weekend_nights + no_of_week_nights,
+                          no_of_people = no_of_adults + no_of_children)
+
+hotel_reverse <- hotel
+hotel_reverse$booking_status_binary <- ifelse(hotel$booking_status == "Canceled", 1, 0)
+
+room_type_vector <- c("Room_Type 1" = "#ff746c", "Room_Type 2" = "#c89c04", "Room_Type 3" = "#58b404", "Room_Type 4" = "#08c494", "Room_Type 5" = "#08b4ec", "Room_Type 6" = "#a88cfc", "Room_Type 7" = "#ff64d4")
+room_label_vector <- c("Тип кімнати №1", "Тип кімнати №2", "Тип кімнати №3", "Тип кімнати №4", "Тип кімнати №5", "Тип кімнати №6", "Тип кімнати №7")
+
+meal_type_vector <- c("Meal Plan 1" = "#ff746c", "Meal Plan 2" = "#80ac04", "Meal Plan 3" = "#08bcc4", "Not Selected" = "#c87cfc")
+meal_label_vector <- c("BB - Bed and Breakfast", "HB - Half Board", "FB - Full Board", "Not Selected")
+```
+
+
+# DUMMY VARIABLES ДЛЯ КАТЕГОРІАЛЬНИХ ЗМІННИХ
+```{r}
+hotel_meal <- hotel %>% mutate(M1 = (type_of_meal_plan == "Meal Plan 1"), M2 = (type_of_meal_plan == "Meal Plan 2"), M3 = (type_of_meal_plan == "Meal Plan 3"))
+```
+
+```{r}
+hotel_room <- hotel %>% mutate(R2 = (room_type_reserved == "Room_Type 2"), R3 = (room_type_reserved == "Room_Type 3"), R4 = (room_type_reserved == "Room_Type 4"), R5 = (room_type_reserved == "Room_Type 5"), R6 = (room_type_reserved == "Room_Type 6"), R7 = (room_type_reserved == "Room_Type 7"))
+```
+
+```{r}
+hotel_market <- hotel %>% mutate(Online = (market_segment_type == "Online"), Corporate = (market_segment_type == "Corporate"), Complementary = (market_segment_type == "Complementary"), Aviation = (market_segment_type == "Aviation"))
+```
+
+
+
+
+### ПИТАННЯ НА РЕГРЕСІЮ
+
+- 1. Що впливає на появу особливих побажань? (з "Чи є істотною наявність особливих побажань?")
+- 2. Чим зумовлено скасування/нескасування резервації? (з "Які характерні риси скасованих записів?")
+
+```{r}
+view(hotel)
+```
+
+
+#### Питання №1
+
+# 1. Що впливає на появу особливих побажань?
+
+# Першу модель (log) побудуємо з досить інтуїтивно очікуваними регресорами. 
+
+- В прешу чергу нам цікаво дізнатися чи враховується таки потреба у паркувальному місці як особливе побажання. Окрім цього, можна очікувати, що на наявність особливих побажань впливатиме ціна, що заплачена за кімнату. 
+
+- Достовірно невідомо що саме являють собою особливі побажання, але це може бути як ранкова корзинка фруктів під дверима так і лебідь з рушників, що очікуватиме гостей на двуспальному ліжку, тому досить важливо було б врахувати ціну, яка заплачена за заброньваний номер.При побудові моделі варто врахувати, що для avg_price_per_room для адекватнішого аналізу його впливу необхідно взяти логаритм цього регресора, адже межі змінної досить широкі (від 9 до 540), через що вплив збільшення значення ціни на 1 одиницю буде майже непомітним. Тож було б логічно розглянути вплив збільшення ціни на 1 відсоток відносно наявності особливих побажань.
+
+- Для початкової моделі братимемо дорослих і дітей поокремо. У нашому датасеті є записи з просто дорослими (їх більшість. 23 тисячі записів мають двох дорослих без дітей), з просто дітьми, і з дорослими та дітьми одночасно. На перший погляд може здатися, що вплив виключно дорослих і виключно дітей має давати більший вплив на наявність особливих побажань, адже це записи або з "парочкою", або з виключно дітьми, для яких можуть бути передбачені окремі умови, тому фактор взаємодії між цими двома регресорами лишимо на потім.
+
+- Останнім регресором в початкову модель додамо бінарну змінну repeated_guest, бо є підозра що у повторних гостей можуть бути певні бонуси, або ж у них за попередні відвідування з'явились вподобання, які теоретично можна віднести до особливих побажань
+### Слайд 1
+```{r}
+requests_logit <- glm(no_of_special_requests ~ required_car_parking_space 
+                      + log(avg_price_per_room) + no_of_adults + no_of_children
+                      + repeated_guest, 
+                        data = hotel,
+                        family = binomial(link = "logit"))
+
+modelsummary(list("basic" = requests_logit),
+             gof_omit = "^(?!Num.Obs.|R2 Adj.)",
+             stars = TRUE)
+```
+
+- Як можемо бачити усі коефіцієнти є статистично значущими і жодний не обертається в нуль.З їх знаку можна зробити висновок про додатній статистично значущий зв'язок з бінарною залежною змінною "наявність особливих побажань".
+
+
+
+- Додамо до базової моделі контрольні змінні: можна підозрювати, що наявність особливих побажань може бути пов'язана з тривалістю зупинки у готелі. Окрім цього є ще такий фактор як час до прибуття. Оскільки час до прибуття аналогічно до avg_price_per_room варіюється на досить великому проміжку, то було б логічно взяти від lead_price логаритм, аби подивитись на вплив збільшення часу до прибуття на 1%. Також варто врахувати те, що типи кімнат відрізняються між собою як мінімум по кількості дітей, тож у нас є ґрунтовні підстави вважати, що через невідому нам різницю між цими типами кімнат може з'являтися більше чи менше особливих побажань.
+```{r}
+requests_logit_controls <- glm(no_of_special_requests ~ lead_time + required_car_parking_space 
+                             + log(avg_price_per_room) + no_of_adults + no_of_children 
+                             + repeated_guest 
+                             + no_of_nights
+                             + R2 + R3 + R4 + R5 + R6 + R7, 
+                        data = hotel_room,
+                        family = binomial(link = "logit"))
+
+modelsummary(list("basic" = requests_logit, "with_control_vars" = requests_logit_controls),
+             gof_omit = "^(?!Num.Obs.)",
+             stars = TRUE)
+```
+
+
+- Додамо фактори взаємодії між змінними. Оскільки в датасеті є записи як з виключно дорослими так і з виключно дітьми, то варто врахувати фактор взаємодії між ними аби включити до розгляду сім'ї з дорослих та дітей. Оскільки як ми побачили раніше коефіцієнт перед required_car_parking_space є статистично значущий, то можна спробувати додати фактор взаємодії між ним та повторним гостем. Окрім того, оскільки більшість записів складають виключно дорослі без дітей, то можна розглянути додатково взаємодію кількості дорослих та повторності гостя.
+```{r}
+requests_logit_factor <- glm(no_of_special_requests ~ I(log(lead_time+1)) + required_car_parking_space 
+                                            + log(avg_price_per_room) + no_of_adults + no_of_children 
+                                            + no_of_adults:no_of_children + no_of_nights + repeated_guest
+                                            + repeated_guest:required_car_parking_space 
+                                            + repeated_guest:no_of_adults
+                                            + R2 + R3 + R4 + R5 + R6 + R7, 
+                        data = hotel_room,
+                        family = binomial(link = "logit"))
+
+modelsummary(list("basic" = requests_logit, "with_control_vars" = requests_logit_controls, 
+                  "all_in_one_with_factors" = requests_logit_factor),
+             gof_omit = "^(?!Num.Obs.)",
+             stars = TRUE)
+```
+
+```{r}
+summary(margins(requests_logit_controls))
+```
+
+
+
+
+
+#### Питання №2
+
+# 2. Чим зумовлено скасування/нескасування резервації?
+
+# Можливість з'ясувати чи буде конкретний запис скасований чи нескасований видається досить профітною. Подумки можна швидко прикинути, що можливо повторні гості відмінятимуть записи з меншою ймовірністю. В той же час статус бронювання мав би бути пов'язаний з часом до прибуття (інутїтивно очікується, що чим більше lead_time, то тим менша ймовірність того, що гість все ж прибуде) та, наприклад, кількістю дітей. Хоч записів з дітьми відносно загальної кількості записів не так вже й багато (2559 з 36275), проте захворювання напередодні поїздки або поведінкові проблеми (чи будь-які інші непередбачувані обставини пов'язані з дітьми) мали б зробити свій внесок у ймовірність скасування.
+
+```{r}
+nrow(original_hotel %>% filter(no_of_adults != 0 & no_of_children != 0))
+
+nrow(original_hotel)
+```
+
+# Побудуємо модель логит, де в ролі залежної бінарної змінної виступатиме атрибут booking_status ('Canceled', 'Not Canceled')
+
+# ДОПИСАТИ
+```{r}
+denylogit <- glm(booking_status ~ lead_time + no_of_adults + no_of_children 
+                 + required_car_parking_space + no_of_nights + repeated_guest, 
+                 family = binomial(link = "logit"), 
+                 data = hotel)
+```
+
+# ДОПИСАТИ
+```{r}
+denylogit_factor <- glm(booking_status ~ lead_time + no_of_adults + no_of_children 
+                        + required_car_parking_space + no_of_nights + repeated_guest 
+                        + I(no_of_adults*no_of_children), 
+                 family = binomial(link = "logit"), 
+                 data = hotel)
+```
+
+# ДОПИСАТИ
+```{r}
+denylogit_with_roomtypes <- glm(booking_status ~ lead_time + no_of_adults 
+                                + no_of_children + required_car_parking_space 
+                                + no_of_nights + repeated_guest 
+                                + R2 + R3 + R4 + R5 + R6 + R7, 
+                 family = binomial(link = "logit"), 
+                 data = hotel_room)
+
+coeftest(denylogit, vcov. = vcovHC(denylogit), type = "hc1")
+
+modelsummary(list("denylogit" = denylogit, "denylogit_factor" = denylogit_factor, 
+                  "denylogit_with_roomtypes" = denylogit_with_roomtypes),
+             stars = TRUE,
+             gof_omit = "^(?!Num.Obs.)")
+```
+
+
+#### Необхідне для питань 3-4
+```{r}
+hotel <- hotel %>% 
+  mutate(log_price = log(avg_price_per_room))
+
+
+hotel_meal <- hotel %>% mutate(M1 = (type_of_meal_plan == "Meal Plan 1"), M2 = (type_of_meal_plan == "Meal Plan 2"), M3 = (type_of_meal_plan == "Meal Plan 3"))
+
+
+hotel_room <- hotel %>% mutate(R2 = (room_type_reserved == "Room_Type 2"), R3 = (room_type_reserved == "Room_Type 3"), R4 = (room_type_reserved == "Room_Type 4"), R5 = (room_type_reserved == "Room_Type 5"), R6 = (room_type_reserved == "Room_Type 6"), R7 = (room_type_reserved == "Room_Type 7"))
+
+
+hotel_market <- hotel %>% mutate(Online = (market_segment_type == "Online"), Corporate = (market_segment_type == "Corporate"), Complementary = (market_segment_type == "Complementary"), Aviation = (market_segment_type == "Aviation"))
+```
+
+
+
+
+
+#### Питання №3
+
+#### 3. Чи є вплив необхідності в паркувальному місці на середню ціну за кімнату?
+
+##### Під час минулої лабораторної роботи було побудовано довірчі інтервали для середньої ціни для різних категорій людей - тих, кому потрібне, і кому не потрібне паркувальне місце. Було помічено статистично значущу різницю в цінах. 
+####Тепер, побудуємо базову модель (1) для залежності логарифму ціни за кімнату від необхідності в паркувальному місці. За цією моделлю видно статистично значущий додатний вплив необхідності в паркувальному місці, проте існує багато сумнівів щодо істинності даної моделі. 
+####Тому, розширимо дану модель додавши декілька логічних контрольних змінних (2). Контрольні змінні - це змінні, які при минулому дослідженні показали зв'язок з необхідністю в паркувальному місці,  а саме: кількість людей, наявність спеціальних запитів, кількість ночей і ринковий сегмент. Бачимо, що майже вдвічі знизився коефіцієнт біля основного регресора, тобто дійсно існувала похибка від неврахованих змінних для першої моделі. 
+####Можемо перевірити модель на стійкість (3)додавши фактор взаємодії паркувального місця і наявністю спец запитів - бачимо, що даний фактор робить коефіцієнт при паркувальному місці незначущим, при цьому для тих, кому необхідне паркувальне місце і при цьому є спеціальні запити коефіцієнт є значущим, і навіть більшим ніж в попередній моделі.
+####Крім цього, можемо спробувати зафіксувати ефекти кімнат (4) і часові ефекти на ціну (5). Бачимо в 4 моделі, що знову ключовий коефіцієнт є незначущим, а для 5 моделі він стає значущим, і його інтерпертація наступна: ті, кому необхідне паркувальне місце платять більше в середньому на 4%. Вважаючи, що середня ціна - 100 євро, можемо вважати що це є символічна ціна за аренду паркувального місця.
+```{r}
+model_car <- feols(log_price ~ required_car_parking_space, data = hotel, vcov = "HC1")
+model_car_ext <- feols(log_price ~ required_car_parking_space + no_of_special_requests + no_of_people + no_of_nights + Online + Corporate + Complementary + Aviation, data = hotel_market, vcov = "HC1")
+model_car_extvz <- feols(log_price ~ required_car_parking_space*no_of_special_requests + no_of_people + no_of_nights + Online + Corporate + Complementary + Aviation , data = hotel_market, vcov = "HC1")
+model_car_room <- feols(log_price ~ required_car_parking_space*no_of_special_requests + no_of_people + no_of_nights + Online + Corporate + Complementary + Aviation  | room_type_reserved , data = hotel_market)
+model_car_room_time <- feols(log_price ~ required_car_parking_space*no_of_special_requests + no_of_people + no_of_nights + Online + Corporate + Complementary + Aviation  | room_type_reserved + arrival_year_and_month, data = hotel_market)
+
+
+desc_row <- tibble(title = c("Фіксовані ефекти кімнат", "Часові фіксовані ефекти"),
+  model_car = c("Ні", "Ні"),
+  model_ext = c("Ні", "Ні"),
+  model_car_extvz = c("Ні", "Ні"),
+  model_car_room = c("Так", "Ні"),
+  model_car_room_time = c("Так", "Так"))
+
+
+modelsummary(list(model_car, model_car_ext, model_car_extvz, model_car_room, model_car_room_time),
+             stars = TRUE,
+             gof_omit = "^(?!Num.Obs.|R2 Adj.)",
+             add_row = desc_row)
+
+
+
+```
+
+
+
+
+#### Питання №4
+
+#### 4. Чи є вплив повторного гостя на середню ціну за кімнату?
+
+#### При дослідженні, проведеному в минулій роботі було показано, що повторний гість має декілька цікавих особливостей, зокрема, як ми побачили по довірчих інтервалах, він платить менше, причому різниця скаладає приблизно 30% в меншу сторону для повторного гостя. Дуже важко повірити, що різниця настільки велика для повторного гостя. Тому необхідно провести регресійний аналіз. 
+#### Спочатку побудуємо базову модель в якій зазначимо лише залежність логарифмованої ціни від повторного гостя, і отримаємо схожий результат. Але у нас є всі сумніви щодо цієї моделі.
+#### Далі побудуємо модель вказавши контрольні змінні, такі як: кількість ночей, кількість людей, ринковий сегмент, необхідність в паркувальному місці - це основні змінні, які можуть корелювати з повторним гостем. Тепер видно вже кращий результат - вплив повторного гостя вже не такий великий, проте значущий. Але і дана модель не викликає повної довіри, бо ми маємо дані панельної природи і, відповідно, потрібно врахувати вплив ефектів кімнат і часу. 
+#### По черзі побудуємо відповідні моделі (3 і 4), бачимо, що вплив повторного гостя залишається значущим, але при врахуванні ефектів став дещо менше. Тобто, можемо сказати, що повторний гість дійсно платить менше, але не так багато, як ми вважали спочатку, а всього приблизно на 12%, в це віриться значно більше ніж в попередній результат. 
+#### Щоб протестувати модель на стійкість додамо фактор взяємодії між повторним гостем і необхідністю в паркувальному місці, як бачимо коефіцієнт біля повторного гостя несильно змінився, тобто можна сказати, що модель є стійкою і дійсно повторний гость платить дещо менше.
+```{r}
+model_guest <-  feols(log_price ~ repeated_guest, data = hotel, vcov = "HC1")
+model_guest_ext <- feols(log_price ~ repeated_guest + no_of_nights + no_of_people + Online + Corporate + Complementary + Aviation + required_car_parking_space, data = hotel_market, vcov = "HC1")
+model_guest_room <- feols(log_price ~ repeated_guest + no_of_nights + no_of_people + Online + Corporate + Complementary + Aviation + required_car_parking_space | room_type_reserved, data = hotel_market)
+model_guest_room_time <- feols(log_price ~ repeated_guest + no_of_nights + no_of_people + Online + Corporate + Complementary + Aviation + required_car_parking_space | room_type_reserved + arrival_year_and_month, data = hotel_market)
+model_guest_nons <- feols(log_price ~ repeated_guest*required_car_parking_space + no_of_nights + no_of_people + Online + Corporate + Complementary + Aviation | room_type_reserved + arrival_year_and_month, data = hotel_market)
+
+desc_row <- tibble(title = c("Фіксовані ефекти кімнат", "Часові фіксовані ефекти"),
+  model_guest = c("Ні", "Ні"),
+  model_guest_ext = c("Ні", "Ні"),
+  model_guest_room = c("Так", "Ні"),
+  model_guest_room_time = c("Так", "Так"),
+  model_guest_nons = c("Так", "Так"))
+
+
+modelsummary(list(model_guest, model_guest_ext, model_guest_room, model_guest_room_time, model_guest_nons),
+             stars = TRUE,
+             gof_omit = "^(?!Num.Obs.|R2 Adj.)",
+             add_row = desc_row)
+
+
+```
+
+
+
+#### Питання №5 
+##(Залишається тільки в звіті)
+#### 5. Чи є вплив кількості людей на середню ціну за кімнату?
+
+#### Ми вже неодноразово бачили що збільшення кількості дорослих і дітей має зв'язок зі збільшенням ціни за кімнату, але чи можна вважати, що він причинно-наслідковий?
+#### Спочатку побудуємо примітивну модель (1) і на ній бачимо, що збільшення дорослого на 1 призведе до підвищення ціни на 16%, а збільшення дитини на 1 аж на 25%. У нас немає приводу довіряти цій моделі. 
+#### Розширимо дану модель додавши контрольні змінні (2), які можуть корелювати з кількістю людей - це кількість ночей і сегмент ринку, також додамо фактор взаємодії між дітьми і дорослими, бо логічно припустити, що існують зміни для кожного з цих регресорів в залежності від іншого. Бачимо, що значення коефіцієнтів зменшилися, особливо для кількості дітей. Але знову є всі здогадки, що модель не є ідеальною.
+#### Моделі 3 і 4 відповідно додають фіксацію щодо впливу типу кімнати і часового проміжку. Бачимо, що коефіцієнти знову змінилися - дещо зросли для дітей і впали для дорослих, тут ми вже врахували всі доступні нам ефекти і можемо вважати, що збільшення кількості дітей і дорослих на одиницю має зв'язок зі збільшенняи ціни за кімнату на 6 і 8 відсотків відповідно.
+#### Протестуємо дану модель на стійкість (5, 6): спочатку (5) перетворимо кількість дітей на бінарну змінну там де їх багато(більше ніж 1) і мало, бачимо, що коефіцієнт при кількості дорослих не сильно змінився, тобто модель є стійкою відносно кількості дорослих. Далі (6) зробимо схоже перетворення кількості дорослих на бінарну змінну - там де їх багато(більше ніж 2) і мало, коефіцієнт біля кількості дітей значно змінився, тобто модель не стійка щодо цієї змінної і могли б існувати інші змінні для зменшення OVB.
+
+```{r}
+model_people <- feols(log_price ~ no_of_adults + no_of_children, data = hotel, vcov = "HC1")
+model_people_ext <- feols(log_price ~ no_of_adults*no_of_children + no_of_nights + Online + Corporate + Complementary + Aviation  , data = hotel_market, vcov = "HC1")
+model_people_room <- feols(log_price ~ no_of_adults*no_of_children + no_of_nights + Online + Corporate + Complementary + Aviation |room_type_reserved   , data = hotel_market)
+model_people_time <- feols(log_price ~ no_of_adults*no_of_children + no_of_nights + Online + Corporate + Complementary + Aviation |room_type_reserved + arrival_year_and_month , data = hotel_market)
+#стійкість 
+model_people_st <- feols(log_price ~ no_of_adults*no_of_children + no_of_nights + Online + Corporate + Complementary + Aviation |room_type_reserved + arrival_year_and_month , data = hotel_market %>% mutate (no_of_children = ifelse(no_of_children > 1, 1, 0)))
+model_people_st_2 <- feols(log_price ~ no_of_adults*no_of_children + no_of_nights + Online + Corporate + Complementary + Aviation |room_type_reserved + arrival_year_and_month , data = hotel_market %>% mutate (no_of_adults = ifelse(no_of_adults > 2, 1, 0)))
+
+modelsummary(list(model_people, model_people_ext, model_people_room, model_people_time, model_people_st, model_people_st_2),
+             stars = TRUE,
+             gof_omit = "^(?!Num.Obs.|R2 Adj.)"
+             )
+
+linearHypothesis(model_people_st, c("no_of_children = 0", "no_of_adults:no_of_children = 0"))
+
+linearHypothesis(model_people_st_2, c("no_of_adults = 0", "no_of_adults:no_of_children = 0"))
+```
+
+
+
+
+
+
+
+
+
+
+
+# МУСОРКА
+
+
+# дослідимо наскільки більша ймовірність відмови бронювання для повторних гостей порівняно з неповторними
+```{r}
+numeric_means <- hotel %>%
+  dplyr::select(lead_time, avg_price_per_room, no_of_adults, no_of_children, no_of_nights) %>%
+  summarize(across(everything(), ~ mean(.)))
+
+new_data <- cbind(numeric_means, 
+                  data.frame(factorno_of_special_requests = c(0, 1), 
+                             required_car_parking_space = factor(0, levels = levels(hotel$required_car_parking_space)),
+                             repeated_guest = factor(0, levels = levels(hotel$repeated_guest))))
+
+new_data <- rbind(new_data, new_data)
+new_data[2, "factorno_of_special_requests"] <- 1
+
+prediction_logit <- predict(requests_logit, new_data, type = "response")
+
+difference <- prediction_logit[2] - prediction_logit[1]
+difference
+```
+
+# кореляції (пріколи)
+```{r include=FALSE}
+temp_hotel <- original_hotel
+temp_hotel %>% mutate(no_of_special_requests = ifelse(no_of_special_requests > 0, 1, 0))
+
+ggcorr(temp_hotel, label = TRUE)
+
+ggcorr(temp_hotel, label = TRUE,
+       method = c("pairwise", "spearman"))
+```
