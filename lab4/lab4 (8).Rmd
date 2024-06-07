@@ -1,0 +1,346 @@
+---
+title: "lab4"
+output: html_document
+date: "2024-06-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, include=FALSE}
+library(modelsummary)
+library(tidyverse)
+library(latex2exp)
+library(FactoMineR)
+library(factoextra)
+library(MASS)
+library(AER)
+library(mice)
+library(caret)
+library(np)
+library(fixest)
+```
+
+
+```{r, include=FALSE}
+original_hotel <- read.csv("Hotel Reservations.csv")
+
+kinda_iriginal_hotel <- original_hotel %>% mutate(no_of_people = no_of_adults + no_of_children)
+
+hotel_corr <- original_hotel
+
+hotel <- original_hotel %>% filter((avg_price_per_room > 9),
+                                   (no_of_children < 8))
+
+hotel <- hotel %>% mutate(repeated_guest = as.factor(repeated_guest), 
+                          required_car_parking_space = as.factor(required_car_parking_space),
+                          booking_status = as.factor(booking_status),
+                          room_type_reserved = as.factor(room_type_reserved),
+                          no_of_special_requests = ifelse(no_of_special_requests == 0, 0, 1),
+                          arrival_date_in_total = paste(arrival_year, arrival_month, arrival_date, sep = "-"),
+                          arrival_year_and_month = paste(arrival_year, arrival_month, sep = "-"),
+                          no_of_people = no_of_adults + no_of_children, 
+                          no_of_nights = no_of_weekend_nights + no_of_week_nights,
+                          no_of_people = no_of_adults + no_of_children)
+
+hotel_reverse <- hotel
+hotel_reverse$booking_status_binary <- ifelse(hotel$booking_status == "Canceled", 1, 0)
+
+room_type_vector <- c("Room_Type 1" = "#ff746c", "Room_Type 2" = "#c89c04", "Room_Type 3" = "#58b404", "Room_Type 4" = "#08c494", "Room_Type 5" = "#08b4ec", "Room_Type 6" = "#a88cfc", "Room_Type 7" = "#ff64d4")
+room_label_vector <- c("Тип кімнати №1", "Тип кімнати №2", "Тип кімнати №3", "Тип кімнати №4", "Тип кімнати №5", "Тип кімнати №6", "Тип кімнати №7")
+
+meal_type_vector <- c("Meal Plan 1" = "#ff746c", "Meal Plan 2" = "#80ac04", "Meal Plan 3" = "#08bcc4", "Not Selected" = "#c87cfc")
+meal_label_vector <- c("BB - Bed and Breakfast", "HB - Half Board", "FB - Full Board", "Not Selected")
+
+
+hotel <- hotel %>% 
+  mutate(log_price = log(avg_price_per_room))
+
+
+hotel_meal <- hotel %>% mutate(M1 = (type_of_meal_plan == "Meal Plan 1"), M2 = (type_of_meal_plan == "Meal Plan 2"), M3 = (type_of_meal_plan == "Meal Plan 3"))
+
+
+hotel_room <- hotel %>% mutate(R2 = (room_type_reserved == "Room_Type 2"), R3 = (room_type_reserved == "Room_Type 3"), R4 = (room_type_reserved == "Room_Type 4"), R5 = (room_type_reserved == "Room_Type 5"), R6 = (room_type_reserved == "Room_Type 6"), R7 = (room_type_reserved == "Room_Type 7"))
+
+
+hotel_market <- hotel %>% mutate(Online = (market_segment_type == "Online"), Corporate = (market_segment_type == "Corporate"), Complementary = (market_segment_type == "Complementary"), Aviation = (market_segment_type == "Aviation"))
+
+hotel_lead <- hotel_market %>%
+  mutate(lead_time = if_else(lead_time == 0, lead_time + 1, lead_time))
+```
+
+#### Назва команди - Команда №3
+#### Перелік учасників колективу виконавців:
+- Пономаренко Олександр (КМ-12)
+- Земляний Даниїл (КМ-12)
+- Борисенко Данило (КМ-11)
+- Заіченко Дамир (КМ-13)
+- Лук'яненко Василь (КМ-13)
+
+
+```{r, include=FALSE}
+hotel <- hotel %>% 
+  mutate(log_price = log(avg_price_per_room + 1))
+hotel <- hotel %>% mutate(no_of_people = no_of_adults + no_of_children)
+hotel <- hotel %>% mutate(no_of_nights = no_of_weekend_nights + no_of_week_nights)
+
+hotel_market <- hotel %>% mutate(Online = (market_segment_type == "Online"), Corporate = (market_segment_type == "Corporate"), Complementary = (market_segment_type == "Complementary"), Aviation = (market_segment_type == "Aviation"))
+
+hotels <- hotel_market
+```
+
+
+#### Створимо непараметричні регресії залежності середньої ціни за кімнату від кількості людей. Відповідно матимемо 2 моделі: одна з оцінкою Надараї-Вотсона, інша - з локально лінійною. 
+```{r}
+x_grid <- seq(min(hotels$no_of_people), max(hotels$no_of_people), by = 1)
+
+h <- npregbw(avg_price_per_room ~ no_of_people, data = hotels, regtype = 'll')
+ll_LOOCV <- npreg(h, newdata = data.frame(no_of_people = x_grid))
+ll_df <- tibble(x = x_grid,
+                y_hat = ll_LOOCV$mean,
+                h = round(h$bw, 3))
+
+
+h <- npregbw(avg_price_per_room ~ no_of_people, data = hotels, regtype = 'lc')
+nw_LOOCV <- npreg(h, newdata = data.frame(no_of_people = x_grid))
+nw_df <- tibble(x = x_grid,
+                y_hat = nw_LOOCV$mean,
+                h = round(h$bw, 3))
+```
+
+
+##### Відповідно побудуємо графік для оцінки Надараї-Вотсона, відмічаючи сірим кольором поточкові довірчі інтервали. Маємо помітно широкі довірчі інтервали для 5-ьох людей, адже це пов'язано з тим, що подібних записів у датасеті досить мало.
+```{r}
+ggplot(data = data.frame(x = x_grid,
+                         y_hat = nw_LOOCV$mean,
+                         lower = nw_LOOCV$mean - qnorm(0.975)*nw_LOOCV$merr,
+                         upper = nw_LOOCV$mean + qnorm(0.975)*nw_LOOCV$merr),
+       aes(x = x, y = y_hat)) +
+  geom_point(data = hotels, aes(x = no_of_people, y = avg_price_per_room), size = 1) +
+  geom_line(linewidth = 1, color = "#08bcc4") +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.5, fill = "gray") +
+  labs(x = "Кількість людей", y = "Середня ціна за кімнату", color = "Тип", linetype = "Тип")
+```
+
+##### Аналогічно побудуємо довірчий інтервал для локальної лінійної регресії. Можемо спостерігати практично ідентичний результат до попереднього.
+```{r}
+ggplot(data = data.frame(x = x_grid,
+                         y_hat = ll_LOOCV$mean,
+                         lower = ll_LOOCV$mean - qnorm(0.975)*ll_LOOCV$merr,
+                         upper = ll_LOOCV$mean + qnorm(0.975)*ll_LOOCV$merr),
+       aes(x = x, y = y_hat)) +
+  geom_point(data = hotels, aes(x = no_of_people, y = avg_price_per_room), size = 1) +
+  geom_line(linewidth = 1, color = "red") +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.5, fill = "gray") +
+  labs(x = "Кількість людей", y = "Середня ціна за кімнату", color = "Тип", linetype = "Тип")
+```
+
+
+##### Накладемо обидва графіки один на одного:
+```{r}
+a_df <- tibble(x = rep(x_grid, 2),
+               y_hat = c(ll_LOOCV$mean,
+                         nw_LOOCV$mean),
+               type = c(rep('Local Linear', length(x_grid)),
+         rep('Nadaraya-Watson', length(x_grid))))
+
+ggplot(hotels, aes(x = no_of_people, y = avg_price_per_room)) +
+  geom_point(size = 1) +
+  geom_line(data = a_df, aes(x = x, y = y_hat, color = type, linetype = type),
+            linewidth = 1) + 
+  scale_linetype_manual(values = c("solid", "dashed")) +
+  labs(x = "Кількість людей", y = "Середня ціна за кімнату", color = "Тип", linetype = "Тип")
+```
+- як бачимо, різницю між графіками для оцінок складно побачити неозброєним оком
+
+
+##### Побудуємо непараметричну регресію для залежності середньої ціни за кімнату від кількості проведених ночей у готелі використовуючи оцінку Надараї-Вотсона.
+```{r}
+x_grid_nights <- seq(min(hotels$no_of_nights), max(hotels$no_of_nights), by = 1)
+
+h <- npregbw(avg_price_per_room ~ no_of_nights, data = hotels, regtype = 'lc')
+ni_LOOCV <- npreg(h, newdata = data.frame(no_of_nights = x_grid_nights))
+
+
+ggplot(data = data.frame(x = x_grid_nights,
+                         y_hat = ni_LOOCV$mean,
+                         lower = ni_LOOCV$mean - qnorm(0.975)*ni_LOOCV$merr,
+                         upper = ni_LOOCV$mean + qnorm(0.975)*ni_LOOCV$merr),
+       aes(x = x, y = y_hat)) +
+  geom_point(data = hotels, aes(x = no_of_nights, y = avg_price_per_room), size = 1) +
+  geom_line(linewidth = 1, color = "red") +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.5, fill = "gray") +
+  labs(x = "Кількість ночей", y = "Середня ціна за кімнату", color = "Тип", linetype = "Тип")
+```
+- загалом картина така, що важко помітити хоч якісь закономірності. Сладно сказати, що кількість ночей має певний вплив на ціну за номер.
+
+
+
+#### Повернемось до однієї з регресійних моделей, розглянутих у попередній лабораторній роботі, а саме "як впливає повторність гостя та потреба у паркувальному місці на ціну". 
+```{r}
+x_grid <- seq(0, 1, by = 1)
+
+h <- npregbw(log_price ~ factor(required_car_parking_space) + factor(repeated_guest), data = hotels, regtype = 'll')
+ll_LOOCV_gst <- npreg(h, newdata = data.frame(
+  repeated_guest = x_grid,
+  required_car_parking_space = 0))
+
+
+h <- npregbw(log_price ~ factor(required_car_parking_space) + factor(repeated_guest), data = hotels, regtype = 'll')
+ll_LOOCV_car <- npreg(h, newdata = data.frame(
+  repeated_guest = x_grid,
+  required_car_parking_space = 1))
+```
+
+
+##### Побудуємо довірчі інтервали для логарифмованої ціни в залежності від того чи є гість повторним, чи ні. При цьому зафіксуємо необхідність у паркувальному місці на медіанному рівні (тобто 0)
+```{r}
+ggplot(data = data.frame(x = c("Ні", "Так"),
+                         y = ll_LOOCV_gst$mean,
+                         se = ll_LOOCV_gst$merr),
+       aes(x = x, y = y)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = y - qnorm(0.975)*se,
+                    ymax = y + qnorm(0.975)*se)) + labs(x = "Повторний гість", y = "Логарифмована ціна")
+```
+- спостерігаємо результат, що є дуже подібним до того, що ми бачили у лінійній регресійній моделі, тобто повторні гості платять приблизно на ~22% менше
+
+
+##### Аналогічно побудуємо довірчі інтервали для логарифмованої ціни в залежності від того чи є гість повторним, чи ні. Тільки в цьому випадку зафіксуємо необхідність у паркувальному місці на одиниці.
+```{r}
+ggplot(data = data.frame(x = c("Ні", "Так"),
+                         y = ll_LOOCV_car$mean,
+                         se = ll_LOOCV_car$merr),
+       aes(x = x, y = y)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = y - qnorm(0.975)*se,
+                    ymax = y + qnorm(0.975)*se)) + labs(x = "Повторний гість", y = "Логарифмована ціна")
+```
+
+- можемо бачити різницю приблизно у 30%, як і у моделі лінійної регресії з попередньої лабораторної роботи
+
+
+
+#### Для повнішого порівняння з попередньою лабораторною роботою необхідно побудувати частково лінійну модель. Для цього непараметрично оцінимо залежність ціни від необхідності у паркувальному місці та фактора повторності гостя, а параметрично - вплив ринкового сегменту, кількості людей, кількосіт ночей і наявності особливих побажань.
+```{r}
+bw <- npplregbw(log_price ~ required_car_parking_space + repeated_guest  | factor(Online) + factor(Corporate) + factor(Complementary) + factor(Aviation) + no_of_people + no_of_nights + no_of_special_requests, data = hotels, regtype = "ll")
+
+model_nppl <- npplreg(bw)
+
+summary(model_nppl)
+```
+
+
+```{r, include=FALSE}
+model_car_ext <- feols(log_price ~ required_car_parking_space + no_of_special_requests + no_of_people + no_of_nights + log(lead_time) + repeated_guest + Online + Corporate + Complementary + Aviation, data = hotel_lead, vcov = "HC1")
+```
+
+#### Розглянемо регресійну модель з попередньої лабораторної роботи. Як бачимо, коефіцієнти лишаються статистично значущими і мають приблизно ті самі значення, тож непараметрична регресія дала подібний результат.
+```{r}
+model_nppl_ti <- tibble(term = names(model_nppl$xcoef),
+                        estimate = model_nppl$xcoef,
+                        std.error = model_nppl$xcoeferr,
+                        p.value = 2*pnorm(-abs(estimate/std.error)))
+model_nppl_gl <- data.frame(Num.Obs. = model_nppl$nobs)
+mod_nppl <- list(tidy = model_nppl_ti, glance = model_nppl_gl)
+class(mod_nppl) <- "modelsummary_list"
+
+modelsummary(list(model_car_ext, mod_nppl),
+             stars = TRUE, gof_omit = "^(?!Num.Obs.)")
+```
+
+
+
+
+##### PCA 
+
+
+```{r, include=FALSE}
+original_hotel <- read.csv("D:/the work/sem 6/data analysis/Hotel Reservations.csv")
+
+hotel_corr <- original_hotel %>% mutate(repeated_guest = as.factor(repeated_guest), 
+                          required_car_parking_space = as.factor(required_car_parking_space),
+                          booking_status = as.factor(booking_status),
+                          room_type_reserved = as.factor(room_type_reserved),
+                          no_of_special_requests = ifelse(no_of_special_requests == 0, 0, 1),
+                          no_of_people = no_of_adults + no_of_children)
+
+
+hotel_for_pca <- hotel_corr %>% 
+  dplyr::select(-c("Booking_ID", "type_of_meal_plan", "room_type_reserved", "booking_status", "market_segment_type", "no_of_previous_bookings_not_canceled", "no_of_previous_cancellations", "arrival_date","arrival_month" )) %>%
+  mutate(log_price = log(avg_price_per_room +1), log_lead_time = log(lead_time + 1))
+
+
+hotel_for_pca <- hotel_for_pca %>%
+  mutate(across(c(required_car_parking_space, repeated_guest), as.numeric))
+
+```
+
+##### Проведемо PCA і подивимось на відповідний screeplot (графік власних чисел)
+
+```{r}
+hotel_pca.pca <- PCA(hotel_for_pca, graph = FALSE)
+
+fviz_screeplot(hotel_pca.pca, addlabels = TRUE)
+```
+##### Бачимо, що як у прикладі з титнаіком у лекції 11, наші результати теж виявились не дуже хорошими. Метод головних компонент зменшив нам кількість компонент з 16 до 8, які разом нам описують 85.1% дисперсії. Це не дуже гарний результат. Спроєктуємо тепер змінні на перші дві компоненти, позначимо градієнтом кольорів внесок різних змінних до загальної дисперсії
+
+```{r}
+fviz_pca_var(hotel_pca.pca, axes = c(1, 2), repel = TRUE, col.var="contrib",
+             gradient.cols = c( "#DDDDDD","#000000")) 
+```
+##### Через те, що у нас назви змінних довгі, графіки сприймаються складно, але все ж можна розгледіти певні залежності. Можна сказати, що першій компоненті із додатним знаком переважно відповідають люди, які платять більше (а також частково: з більшою кількістю людей, на більшу кількість ночей, заселяються раніше; більш загально: приїжджають на відпочинок), із від'ємним знаком - ті хто платять менше, що є однією з основних ознак повторного гостя, як ми визначили за результатами минулих лабораторних робіт. 
+
+##### Подивимось що вплинуло на формування перших двох компонент.
+```{r}
+fviz_contrib(hotel_pca.pca, choice = "var", axes = 1, top = 2000)
+```
+```{r}
+fviz_contrib(hotel_pca.pca, choice = "var", axes = 2, top = 2000)
+```
+
+##### Подивимось також на третю
+```{r}
+fviz_contrib(hotel_pca.pca, choice = "var", axes = 3, top = 2000)
+```
+
+##### Якщо побудувати графік проєкцій змінних на першу і третю компоненти, ми отримаємо майже такий самий результат як і з першою та другою, тож не бачимо сенсу це робити.
+
+##### Розглянемо це більше детально, за допомогою різних біграфіків (biplot). Побудуємо біграфік по цим компонентам, вказавши критерій відбору дослідження - booking_status (статус скасування замовлення), а також вказавши, що ми наносимо тільки перші 2000 "найвпливовіших" спостережнь. 
+```{r}
+fviz_pca_biplot(hotel_pca.pca, axes = c(1, 2), geom = "point",
+                select.ind = list(contrib = 2000), pointshape = 1,
+                col.ind = factor(hotel_corr$booking_status), repel = TRUE)
+```
+##### За цим графіком можна побачити, що значна частина людей з додатним знаком по першій компоненті відмінила запис до готелю, в той час як люди з від'ємної сторони цієї компоненти - майже не відміняли взагалі. Це досить цікавий результат. Подивимось тепер такий самий графік, але позначивши замість статусу скасування - тип кімнати.
+
+```{r}
+fviz_pca_biplot(hotel_pca.pca, axes = c(1, 2), geom = "point",
+                select.ind = list(contrib = 2000), pointshape = 1,
+                col.ind = factor(hotel_corr$room_type_reserved), repel = TRUE)
+```
+##### Через велику кількість атрибут, графік вийшов трохи захарщений, щоб побачити більш "чисту" картинку, побудуємо цей самий графік, але без "стрілочок", також змінимо палітру кольорів на більш яскраву, але зі збільшеною прозорістю.
+
+```{r}
+fviz_pca_ind(hotel_pca.pca, axes = c(1, 2), geom = c("point"),
+             select.ind = list(contrib = 2000), alpha.ind = 0.4,
+             col.ind = factor(hotel_corr$room_type_reserved),
+             pointshape = 1, palette =  c("Room_Type 1" = "#FF0000", "Room_Type 2" = "#FFDB00", "Room_Type 3" = "#49FF00", "Room_Type 4" = "#00FF92", "Room_Type 5" =  "#0092FF", "Room_Type 6" =  "#4900FF", "Room_Type 7" = "#FF00DB"))
+```
+##### Тепер видніше. Ще у першій лабораторній роботі ми помітили, що скоріше за все, 6 і 7 типи кімнат дорожчі ніж перший (найбільш популярний). За цим графіком бачимо, що дійсно ті, хто платили менше заслелялись в переважній більшості до першого типу кімнати, в той час як ті хто платили менше і з більшою кількістю людей - у 6 і 7 типи.
+
+##### Побудуємо аналогічні графіки, але для market_segment_type (ринкового сигментування записів)
+```{r}
+fviz_pca_biplot(hotel_pca.pca, axes = c(1, 2), geom = "point",
+                select.ind = list(contrib = 1500), pointshape = 1,
+                col.ind = factor(hotel_corr$market_segment_type), repel = TRUE)
+
+fviz_pca_ind(hotel_pca.pca, axes = c(1, 2), geom = c("point"),
+             select.ind = list(contrib = 1500), alpha.ind = 0.5,
+             col.ind = factor(hotel_corr$market_segment_type),
+             pointshape = 1, palette = c("#FF0000", "#CCFF00" ,"#00FF66", "#0066FF", "#CC00FF"))
+
+```
+##### Бачимо ще більш цікаву картину. Виявляється що переважна більшість людей з мінусовим знаком першої компоненти (ті хто платять менше, і часто повторні гості) належать до особливого сегменту ринку! Тобто люди зліва - ті, що приїжджають майже безкоштовно (Complementary), або на відрядження (Corporate чи Aviation). Також можна помітити, що була частина людей, які як і всі  брали квитки онлайн, але при цьому платили менше. Це можна пояснити тим, що гість вже знає за що можна платити і не платити.
